@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
+import '../../core/state/language_controller.dart';
 import '../../core/theme/zova_colors.dart';
-import '../../data/models/dictionary_entry.dart';
-import '../../data/services/dictionary.dart';
-import '../../data/services/dictionary_service.dart';
+import '../../data/models/translation_language.dart';
+import '../../data/models/translation_result.dart';
+import '../../data/offline/starter_words.dart';
+import '../../data/services/translation_service.dart';
 import 'leitner_review_screen.dart';
 
 /// Schedule label shown for each Leitner box.
@@ -22,9 +24,60 @@ const List<String> kLeitnerSchedule = [
 /// Leitner Box: spaced repetition for your vocabulary.
 ///
 /// Words start in box 1. Correct recalls promote them to the next box (less
-/// frequent reviews), forgotten words drop back to box 1.
-class LeitnerBoxScreen extends StatelessWidget {
+/// frequent reviews), forgotten words drop back to box 1. Translations are
+/// resolved live through the [TranslationService] (cached, so they survive
+/// offline).
+class LeitnerBoxScreen extends StatefulWidget {
   const LeitnerBoxScreen({super.key});
+
+  @override
+  State<LeitnerBoxScreen> createState() => _LeitnerBoxScreenState();
+}
+
+class _LeitnerBoxScreenState extends State<LeitnerBoxScreen> {
+  final Map<String, TranslationResult> _resolved = {};
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final controller = context.read<AppController>();
+    final languageCode =
+        context.read<LanguageController>().settings.translationLanguage.code;
+    _resolved.clear();
+    for (final word in controller.progress.leitnerBoxes.keys) {
+      await _resolve(word, languageCode);
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _resolve(String word, String languageCode) async {
+    try {
+      final result = await TranslationService.instance.lookupAnySource(
+        word: word,
+        target: languageCode,
+      );
+      _resolved[word] = result ??
+          TranslationResult(
+            word: word,
+            source: 'en',
+            target: languageCode,
+            translation: '',
+          );
+    } on TranslationException {
+      _resolved[word] = TranslationResult(
+        word: word,
+        source: 'en',
+        target: languageCode,
+        translation: '',
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,98 +97,86 @@ class LeitnerBoxScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Leitner Box')),
       body: SafeArea(
-        child: FutureBuilder<List<DictionaryService>>(
-          future: Future.wait([Dictionary.service, GermanDictionary.service]),
-          builder: (context, snapshot) {
-            final dictionaries = snapshot.data;
-            final english = dictionaries?[0];
-            DictionaryEntry? resolve(String word) {
-              if (dictionaries == null) return null;
-              for (final dict in dictionaries) {
-                final entry = dict.lookup(word);
-                if (entry != null) return entry;
-              }
-              return null;
-            }
-
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-              children: [
-                const Text(
-                  'Words you never forget',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: ZovaColors.textPrimary,
-                  ),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          children: [
+            const Text(
+              'Words you never forget',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                color: ZovaColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Review words in short sessions. Right answers move words '
+              'to a higher box, wrong answers send them back to box 1.',
+              style: TextStyle(color: ZovaColors.textSecondary, height: 1.4),
+            ),
+            if (_loading) ...[
+              const SizedBox(height: 12),
+              const LinearProgressIndicator(minHeight: 3),
+            ],
+            const SizedBox(height: 18),
+            _BoxStatsCard(total: total, dueToday: dueToday),
+            const SizedBox(height: 16),
+            _WordPoolCard(controller: controller),
+            const SizedBox(height: 24),
+            if (total == 0)
+              const _EmptyState()
+            else ...[
+              const Text(
+                'Your boxes',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: ZovaColors.textPrimary,
                 ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Review words in short sessions. Right answers move words '
-                  'to a higher box, wrong answers send them back to box 1.',
-                  style: TextStyle(color: ZovaColors.textSecondary, height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              for (var box = 1; box <= 5; box++) ...[
+                _BoxCard(
+                  box: box,
+                  schedule: kLeitnerSchedule[box - 1],
+                  count: boxes.values.where((b) => b == box).length,
+                  dueToday: dueByBox[box] ?? 0,
+                  words: boxes.entries
+                      .where((e) => e.value == box)
+                      .map((e) => _resolved[e.key])
+                      .whereType<TranslationResult>()
+                      .toList(),
+                  onStudy: (words) {
+                    if (words.isEmpty) return;
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => LeitnerReviewScreen(
+                          box: box,
+                          words: words,
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                const SizedBox(height: 18),
-                _BoxStatsCard(total: total, dueToday: dueToday),
-                if (english != null) ...[
-                  const SizedBox(height: 16),
-                  _WordPoolCard(dict: english, controller: controller),
-                ],
-                const SizedBox(height: 24),
-                if (total == 0)
-                  const _EmptyState()
-                else ...[
-                  const Text(
-                    'Your boxes',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: ZovaColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  for (var box = 1; box <= 5; box++) ...[
-                    _BoxCard(
-                      box: box,
-                      schedule: kLeitnerSchedule[box - 1],
-                      count: boxes.values.where((b) => b == box).length,
-                      dueToday: dueByBox[box] ?? 0,
-                      words: boxes.entries
-                          .where((e) => e.value == box)
-                          .map((e) => resolve(e.key))
-                          .whereType<DictionaryEntry>()
-                          .toList(),
-                      onStudy: (words) {
-                        if (words.isEmpty) return;
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => LeitnerReviewScreen(
-                              box: box,
-                              words: words,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                ],
+                const SizedBox(height: 10),
               ],
-            );
-          },
+            ],
+          ],
         ),
       ),
     );
   }
 }
 
-/// A "pull from the dictionary" pool: picks a handful of words from a chosen
-/// CEFR level via the indexed [DictionaryService] and lets the learner drop
-/// them all into their Leitner boxes in one tap.
-class _WordPoolCard extends StatefulWidget {
-  const _WordPoolCard({required this.dict, required this.controller});
+/// A suggested word and its (optional, lazily loaded) translation.
+typedef _PoolWord = ({String word, String? translation});
 
-  final DictionaryService dict;
+/// A "pull from the starter lists" pool: suggests common words for the chosen
+/// source language and CEFR level, resolves their translations live and lets
+/// the learner drop them all into their Leitner boxes in one tap.
+class _WordPoolCard extends StatefulWidget {
+  const _WordPoolCard({required this.controller});
+
   final AppController controller;
 
   @override
@@ -143,45 +184,64 @@ class _WordPoolCard extends StatefulWidget {
 }
 
 class _WordPoolCardState extends State<_WordPoolCard> {
-  static const int _poolSize = 30;
   static const int _shown = 6;
 
+  String _source = 'en';
   String _level = 'A1';
   int _seed = 0;
-  List<DictionaryEntry> _pool = const [];
+  List<_PoolWord> _pool = const [];
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _pool = _computePool();
+    _computePool();
   }
 
-  List<DictionaryEntry> _computePool() {
-    final result = widget.dict.searchPaged(
-      DictionaryQuery(levels: [_level], limit: _poolSize),
-    );
+  Future<void> _computePool({bool reseed = false}) async {
+    if (reseed) _seed++;
+    setState(() => _loading = true);
     final inBox = widget.controller.progress.leitnerBoxes;
-    return result.items
-        .where((e) => !inBox.containsKey(e.word))
+    final candidates = starterWordsFor(_source, _level)
+        .where((word) => !inBox.containsKey(word))
         .toList()
       ..shuffle(Random(_seed));
-  }
 
-  void _refresh({bool reseed = false}) {
-    if (reseed) _seed++;
-    setState(() => _pool = _computePool());
+    final languageCode =
+        context.read<LanguageController>().settings.translationLanguage.code;
+    final resolved = <_PoolWord>[];
+    for (final word in candidates.take(_shown)) {
+      String? translation;
+      try {
+        final result = await TranslationService.instance.lookup(
+          word: word,
+          source: _source,
+          target: languageCode,
+        );
+        translation = result.translation;
+      } on TranslationException {
+        translation = null;
+      }
+      resolved.add((word: word, translation: translation));
+    }
+    if (mounted) {
+      setState(() {
+        _pool = resolved;
+        _loading = false;
+      });
+    }
   }
 
   void _addAll() {
-    for (final entry in _pool) {
-      widget.controller.addToLeitner(entry.word);
+    for (final poolWord in _pool) {
+      widget.controller.addToLeitner(poolWord.word);
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Added ${_pool.length} words to your Leitner Box'),
       ),
     );
-    _refresh(reseed: true);
+    _computePool(reseed: true);
   }
 
   @override
@@ -214,7 +274,7 @@ class _WordPoolCardState extends State<_WordPoolCard> {
               ),
               IconButton(
                 tooltip: 'Shuffle',
-                onPressed: () => _refresh(reseed: true),
+                onPressed: () => _computePool(reseed: true),
                 icon: const Icon(Icons.shuffle, size: 20),
                 visualDensity: VisualDensity.compact,
               ),
@@ -222,8 +282,8 @@ class _WordPoolCardState extends State<_WordPoolCard> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Practice a new level or shuffle — add a handful of words to your '
-            'boxes straight from the dictionary.',
+            'Common starter words for your language — add a handful to your '
+            'boxes straight away. Translations load live and stay cached.',
             style: TextStyle(
               fontSize: 13,
               height: 1.4,
@@ -231,12 +291,43 @@ class _WordPoolCardState extends State<_WordPoolCard> {
             ),
           ),
           const SizedBox(height: 12),
+          Row(
+            children: [
+              for (final language in kStarterWords.keys)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(
+                      language.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    selected: _source == language,
+                    onSelected: (_) {
+                      setState(() => _source = language);
+                      _computePool();
+                    },
+                    visualDensity: VisualDensity.compact,
+                    selectedColor: ZovaColors.primary,
+                    backgroundColor: ZovaColors.surfaceRaised,
+                    labelStyle: TextStyle(
+                      color: _source == language
+                          ? Colors.white
+                          : ZovaColors.textSecondary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
           SizedBox(
             height: 34,
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: [
-                for (final level in kCefrLevels) ...[
+                for (final level in kStarterLevels) ...[
                   ChoiceChip(
                     label: Text(
                       level,
@@ -248,7 +339,7 @@ class _WordPoolCardState extends State<_WordPoolCard> {
                     selected: _level == level,
                     onSelected: (_) {
                       setState(() => _level = level);
-                      _refresh();
+                      _computePool();
                     },
                     visualDensity: VisualDensity.compact,
                     selectedColor: ZovaColors.primary,
@@ -265,7 +356,18 @@ class _WordPoolCardState extends State<_WordPoolCard> {
             ),
           ),
           const SizedBox(height: 12),
-          if (_pool.isEmpty)
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
+              ),
+            )
+          else if (_pool.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 6),
               child: Text(
@@ -278,7 +380,7 @@ class _WordPoolCardState extends State<_WordPoolCard> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final entry in _pool.take(_shown))
+                for (final poolWord in _pool)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -292,21 +394,26 @@ class _WordPoolCardState extends State<_WordPoolCard> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          entry.word,
+                          poolWord.word,
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                             color: ZovaColors.textPrimary,
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          entry.translation,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: ZovaColors.textSecondary,
+                        if (poolWord.translation != null) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            poolWord.translation!,
+                            textDirection: _isRtlTarget()
+                                ? TextDirection.rtl
+                                : TextDirection.ltr,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: ZovaColors.textSecondary,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -324,7 +431,7 @@ class _WordPoolCardState extends State<_WordPoolCard> {
                 onPressed: _addAll,
                 icon: const Icon(Icons.playlist_add, size: 20),
                 label: Text(
-                  'Add ${_pool.take(_shown).length} words to my boxes',
+                  'Add ${_pool.length} words to my boxes',
                 ),
               ),
             ),
@@ -333,6 +440,12 @@ class _WordPoolCardState extends State<_WordPoolCard> {
       ),
     );
   }
+
+  bool _isRtlTarget() =>
+      TranslationLanguage.byCode(
+            context.read<LanguageController>().settings.translationLanguage.code,
+          )?.isRtl ??
+      false;
 }
 
 class _BoxStatsCard extends StatelessWidget {
@@ -432,8 +545,8 @@ class _BoxCard extends StatelessWidget {
   final String schedule;
   final int count;
   final int dueToday;
-  final List<DictionaryEntry> words;
-  final void Function(List<DictionaryEntry> words) onStudy;
+  final List<TranslationResult> words;
+  final void Function(List<TranslationResult> words) onStudy;
 
   @override
   Widget build(BuildContext context) {
@@ -445,9 +558,7 @@ class _BoxCard extends StatelessWidget {
       _ => ZovaColors.success,
     };
 
-    final dueLabel = dueToday == 0
-        ? null
-        : ' · $dueToday due today';
+    final dueLabel = dueToday == 0 ? null : ' · $dueToday due today';
 
     return Container(
       padding: const EdgeInsets.all(16),

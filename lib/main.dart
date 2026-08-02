@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
 import 'app.dart';
@@ -6,6 +8,9 @@ import 'core/state/app_controller.dart';
 import 'core/state/language_controller.dart';
 import 'data/services/remote_api.dart';
 import 'data/services/stripe_service.dart';
+import 'data/services/translation_backend.dart';
+import 'data/services/translation_cache.dart';
+import 'data/services/translation_service.dart';
 
 /// Entry point. Boots the backend (Supabase when configured, otherwise the
 /// local demo store) and hands control to the widget tree.
@@ -14,6 +19,14 @@ Future<void> main() async {
 
   await RemoteApi.instance.init();
   await StripeService.instance.init();
+
+  // Boot the dynamic translation bridge: a Hive-persisted LRU cache layered
+  // over the online lookup provider. Falls back to a memory-only cache when
+  // the filesystem/Hive is unavailable.
+  TranslationService.instance = TranslationService(
+    backend: buildDefaultTranslationBackend(),
+    cache: await _buildTranslationCache(),
+  );
 
   final language = LanguageController();
   await language.bootstrap();
@@ -27,4 +40,16 @@ Future<void> main() async {
       child: const ZovaApp(),
     ),
   );
+}
+
+Future<TranslationCache> _buildTranslationCache() async {
+  try {
+    final directory = await getApplicationSupportDirectory();
+    Hive.init(directory.path);
+    final cache = HiveTranslationCache();
+    await cache.open();
+    return cache;
+  } catch (_) {
+    return MemoryTranslationCache();
+  }
 }

@@ -4,11 +4,14 @@ import 'package:provider/provider.dart';
 import '../../core/state/app_controller.dart';
 import '../../core/state/language_controller.dart';
 import '../../core/theme/zova_colors.dart';
-import '../../data/models/dictionary_entry.dart';
-import '../../data/services/dictionary.dart';
-import '../../data/services/dictionary_service.dart';
+import '../../data/models/translation_result.dart';
+import '../../data/services/translation_service.dart';
 
 /// My Words: the words the learner has bookmarked from the dictionary.
+///
+/// Bookmarks only store the word string; the current translation is resolved
+/// on demand through the dynamic [TranslationService] (and served from cache
+/// when offline).
 class MyWordsScreen extends StatelessWidget {
   const MyWordsScreen({super.key});
 
@@ -16,102 +19,181 @@ class MyWordsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = context.watch<AppController>();
     final savedWords = controller.progress.savedWords;
+    final languageCode =
+        context.watch<LanguageController>().settings.translationLanguage.code;
 
     return Scaffold(
       appBar: AppBar(title: const Text('My Words')),
       body: SafeArea(
-        child: FutureBuilder<List<DictionaryService>>(
-          future: Future.wait([Dictionary.service, GermanDictionary.service]),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final dictionaries = snapshot.data!;
-            final entries = <DictionaryEntry>[];
-            for (final word in savedWords) {
-              for (final dict in dictionaries) {
-                final entry = dict.lookup(word);
-                if (entry != null) {
-                  entries.add(entry);
-                  break;
-                }
-              }
-            }
-
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-              children: [
-                const Text(
-                  'Words you saved',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: ZovaColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${entries.length} ${entries.length == 1 ? 'word' : 'words'} '
-                  '· bookmark words from the dictionary to keep them here.',
-                  style: const TextStyle(
-                    color: ZovaColors.textSecondary,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (entries.isNotEmpty)
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 50),
-                    ),
-                    onPressed: () {
-                      for (final entry in entries) {
-                        controller.addToLeitner(entry.word);
-                      }
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Added ${entries.length} words to your Leitner Box',
-                          ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.style, size: 20),
-                    label: const Text('Add all to Leitner Box'),
-                  ),
-                const SizedBox(height: 20),
-                if (entries.isEmpty)
-                  const _EmptyState()
-                else
-                  for (final entry in entries) ...[
-                    _WordCard(
-                      entry: entry,
-                      inLeitner: controller.progress.leitnerBoxes
-                          .containsKey(entry.word),
-                      onAddToLeitner: () {
-                        controller.addToLeitner(entry.word);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Added "${entry.word}" to Leitner')),
-                        );
-                      },
-                      onRemove: () {
-                        controller.removeSavedWord(entry.word);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Removed "${entry.word}" from My Words'),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-              ],
-            );
-          },
+        child: _SavedWordsList(
+          key: ValueKey(savedWords),
+          words: savedWords,
+          languageCode: languageCode,
+          controller: controller,
         ),
       ),
     );
   }
+}
+
+class _SavedWordsList extends StatefulWidget {
+  const _SavedWordsList({
+    super.key,
+    required this.words,
+    required this.languageCode,
+    required this.controller,
+  });
+
+  final List<String> words;
+  final String languageCode;
+  final AppController controller;
+
+  @override
+  State<_SavedWordsList> createState() => _SavedWordsListState();
+}
+
+class _SavedWordsListState extends State<_SavedWordsList> {
+  final Map<String, TranslationResult> _results = {};
+  final Set<String> _failed = {};
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _resolveWord(String word) async {
+    try {
+      final result = await TranslationService.instance.lookupAnySource(
+        word: word,
+        target: widget.languageCode,
+      );
+      if (!mounted) return;
+      setState(() {
+        if (result != null && !result.isEmpty) {
+          _results[word] = result;
+          _failed.remove(word);
+        } else {
+          _results.remove(word);
+          _failed.add(word);
+        }
+      });
+    } on TranslationException {
+      if (!mounted) return;
+      setState(() {
+        _results.remove(word);
+        _failed.add(word);
+      });
+    }
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    for (final word in widget.words) {
+      await _resolveWord(word);
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = [for (final word in widget.words) _entryOf(word)];
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      children: [
+        const Text(
+          'Words you saved',
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            color: ZovaColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _loading
+              ? 'Resolving translations…'
+              : '${entries.length} ${entries.length == 1 ? 'word' : 'words'} · '
+                  'bookmark words from the dictionary to keep them here.',
+          style: const TextStyle(
+            color: ZovaColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (entries.isNotEmpty && !_loading)
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 50),
+            ),
+            onPressed: () {
+              for (final entry in entries) {
+                widget.controller.addToLeitner(entry.word);
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Added ${entries.length} words to your Leitner Box',
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.style, size: 20),
+            label: const Text('Add all to Leitner Box'),
+          ),
+        const SizedBox(height: 20),
+        if (_loading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+          )
+        else if (entries.isEmpty)
+          const _EmptyState()
+        else
+          for (final entry in entries) ...[
+            _WordCard(
+              entry: entry,
+              inLeitner: widget.controller.progress.leitnerBoxes
+                  .containsKey(entry.word),
+              onRetry: () => _resolveWord(entry.word),
+              onAddToLeitner: () {
+                widget.controller.addToLeitner(entry.word);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Added "${entry.word}" to Leitner')),
+                );
+              },
+              onRemove: () {
+                widget.controller.removeSavedWord(entry.word);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Removed "${entry.word}" from My Words'),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
+      ],
+    );
+  }
+
+  _WordEntry _entryOf(String word) {
+    final result = _results[word];
+    if (result != null) return _WordEntry(word, result);
+    return _WordEntry(word, null, failed: _failed.contains(word));
+  }
+}
+
+class _WordEntry {
+  const _WordEntry(this.word, this.result, {this.failed = false});
+
+  final String word;
+  final TranslationResult? result;
+  final bool failed;
 }
 
 class _EmptyState extends StatelessWidget {
@@ -159,26 +241,21 @@ class _WordCard extends StatelessWidget {
   const _WordCard({
     required this.entry,
     required this.inLeitner,
+    required this.onRetry,
     required this.onAddToLeitner,
     required this.onRemove,
   });
 
-  final DictionaryEntry entry;
+  final _WordEntry entry;
   final bool inLeitner;
+  final VoidCallback onRetry;
   final VoidCallback onAddToLeitner;
   final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
-    final levelColor = switch (entry.level) {
-      'A1' => ZovaColors.success,
-      'A2' => ZovaColors.primary,
-      _ => ZovaColors.warning,
-    };
-    final code =
-        context.watch<LanguageController>().settings.translationLanguage.code;
-    final primary = entry.translationIn(code);
-    final secondary = code == 'fa' ? entry.englishTranslation : entry.translation;
+    final result = entry.result;
+    final rtl = result?.isRtl ?? false;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -205,44 +282,53 @@ class _WordCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: levelColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(7),
-                      ),
-                      child: Text(
-                        entry.level,
+                    if (result?.glossLine != null) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        result!.glossLine!,
                         style: TextStyle(
-                          color: levelColor,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 11,
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          color: ZovaColors.textSecondary.withValues(alpha: 0.8),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  primary,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: ZovaColors.secondary,
-                  ),
-                ),
-                if (secondary.isNotEmpty && secondary != primary) ...[
-                  const SizedBox(height: 2),
+                if (entry.failed)
+                  Row(
+                    children: [
+                      const Icon(Icons.cloud_off,
+                          size: 14, color: ZovaColors.textSecondary),
+                      const SizedBox(width: 6),
+                      const Expanded(
+                        child: Text(
+                          'Offline — tap to retry',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: ZovaColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Retry',
+                        onPressed: onRetry,
+                        icon: const Icon(Icons.refresh, size: 18),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                  )
+                else
                   Text(
-                    secondary,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: ZovaColors.textSecondary.withValues(alpha: 0.9),
+                    result?.translation ?? '',
+                    textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: ZovaColors.secondary,
                     ),
                   ),
-                ],
               ],
             ),
           ),

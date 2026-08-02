@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/state/app_controller.dart';
 import '../../core/state/language_controller.dart';
 import '../../core/theme/zova_colors.dart';
-import '../../data/models/dictionary_entry.dart';
+import '../../data/models/translation_result.dart';
 
 /// Flashcard review session for one Leitner box.
 ///
@@ -18,7 +18,7 @@ class LeitnerReviewScreen extends StatefulWidget {
   });
 
   final int box;
-  final List<DictionaryEntry> words;
+  final List<TranslationResult> words;
 
   @override
   State<LeitnerReviewScreen> createState() => _LeitnerReviewScreenState();
@@ -30,7 +30,7 @@ class _LeitnerReviewScreenState extends State<LeitnerReviewScreen> {
   int _known = 0;
   int _relearned = 0;
 
-  DictionaryEntry get _current => widget.words[_index];
+  TranslationResult get _current => widget.words[_index];
 
   bool get _isDone => _index >= widget.words.length;
 
@@ -147,7 +147,7 @@ class _Flashcard extends StatelessWidget {
     required this.onTap,
   });
 
-  final DictionaryEntry entry;
+  final TranslationResult entry;
   final bool revealed;
   final VoidCallback onTap;
 
@@ -177,6 +177,7 @@ class _Flashcard extends StatelessWidget {
   }
 
   Widget _word(BuildContext context) {
+    final rtl = entry.isRtl;
     return Column(
       key: const ValueKey('word'),
       mainAxisAlignment: MainAxisAlignment.center,
@@ -195,10 +196,11 @@ class _Flashcard extends StatelessWidget {
             ),
           ),
         ),
-        if (entry.phonetic != null) ...[
+        if (entry.glossLine != null) ...[
           const SizedBox(height: 8),
           Text(
-            entry.phonetic!,
+            entry.glossLine!,
+            textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
             style: const TextStyle(
               fontSize: 16,
               color: ZovaColors.secondary,
@@ -213,6 +215,7 @@ class _Flashcard extends StatelessWidget {
   Widget _meaning(BuildContext context) {
     final code =
         context.watch<LanguageController>().settings.translationLanguage.code;
+    final rtl = entry.isRtl || code == 'fa';
     return SingleChildScrollView(
       key: const ValueKey('meaning'),
       padding: const EdgeInsets.all(24),
@@ -220,8 +223,8 @@ class _Flashcard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            entry.translationIn(code),
-            textDirection: code == 'fa' ? TextDirection.rtl : TextDirection.ltr,
+            entry.translation,
+            textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 26,
@@ -240,7 +243,7 @@ class _Flashcard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '“${entry.example}”',
+            entry.example == null ? '—' : '“${entry.example}”',
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 16,
@@ -248,16 +251,18 @@ class _Flashcard extends StatelessWidget {
               color: ZovaColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            entry.exampleIn(code),
-            textDirection: code == 'fa' ? TextDirection.rtl : TextDirection.ltr,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 14,
-              color: ZovaColors.textSecondary,
+          if (entry.exampleTranslation != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              entry.exampleTranslation!,
+              textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                color: ZovaColors.textSecondary,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

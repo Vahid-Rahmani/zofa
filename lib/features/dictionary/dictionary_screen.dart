@@ -6,14 +6,17 @@ import 'package:provider/provider.dart';
 import '../../core/state/app_controller.dart';
 import '../../core/state/language_controller.dart';
 import '../../core/theme/zova_colors.dart';
-import '../../data/models/dictionary_entry.dart';
-import '../../data/services/dictionary.dart';
-import '../../data/services/dictionary_service.dart';
+import '../../data/models/translation_language.dart';
+import '../../data/models/translation_result.dart';
+import '../../data/services/translation_service.dart';
 
-/// The Dictionary tab: searchable English/German -> Persian dictionary backed
-/// by the indexed [DictionaryService]. Searches are debounced and paginated so
-/// the UI stays smooth even with hundreds of thousands of entries, and results
-/// scroll infinitely while filters (level, part of speech, topic) narrow them.
+/// The Dictionary tab: a live, dynamic translation lookup.
+///
+/// Instead of searching a bundled word list, the learner picks any source and
+/// target language pair and the app bridges to a real-time translation
+/// provider ([TranslationService]), with definitions, genders and examples
+/// fetched on demand. Every lookup is cached locally (LRU + Hive) so repeats
+/// are instant and recently viewed words work offline.
 class DictionaryScreen extends StatefulWidget {
   const DictionaryScreen({super.key});
 
@@ -22,177 +25,123 @@ class DictionaryScreen extends StatefulWidget {
 }
 
 class _DictionaryScreenState extends State<DictionaryScreen> {
-  /// Whether the German dictionary is shown instead of the English one.
-  bool _isGerman = false;
-
-  late final Future<DictionaryService> _english = Dictionary.service;
-  late final Future<DictionaryService> _german = GermanDictionary.service;
-
-  @override
-  Widget build(BuildContext context) {
-    final language = context.watch<LanguageController>();
-    final translationLanguage = language.settings.translationLanguage;
-    final future = _isGerman ? _german : _english;
-    return FutureBuilder<DictionaryService>(
-      future: future,
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-        return _DictionaryBody(
-          key: ValueKey(_isGerman),
-          dict: snapshot.data!,
-          languageLabel:
-              '${_isGerman ? 'German' : 'English'} → ${translationLanguage.label}',
-          isGerman: _isGerman,
-          onLanguageChanged: (value) => setState(() => _isGerman = value),
-        );
-      },
-    );
-  }
-}
-
-/// Stateful search/filter/pagination surface for one loaded dictionary.
-class _DictionaryBody extends StatefulWidget {
-  const _DictionaryBody({
-    super.key,
-    required this.dict,
-    required this.languageLabel,
-    required this.isGerman,
-    required this.onLanguageChanged,
-  });
-
-  final DictionaryService dict;
-  final String languageLabel;
-  final bool isGerman;
-  final ValueChanged<bool> onLanguageChanged;
-
-  @override
-  State<_DictionaryBody> createState() => _DictionaryBodyState();
-}
-
-class _DictionaryBodyState extends State<_DictionaryBody> {
-  static const int _pageSize = 40;
+  static final TranslationLanguage _english = TranslationLanguage.byCode('en')!;
+  static final TranslationLanguage _persian = TranslationLanguage.byCode('fa')!;
 
   final _searchController = TextEditingController();
-  final _scrollController = ScrollController();
   Timer? _debounce;
 
+  late TranslationLanguage _source;
+  late TranslationLanguage _target;
+
   String _query = '';
+  TranslationResult? _result;
+  TranslationException? _error;
+  bool _loading = false;
 
-  /// Selected CEFR level; `null` means all levels.
-  String? _level;
-
-  /// Selected part of speech; `null` means all.
-  String? _pos;
-
-  /// Selected topic / free-form tag; `null` means all.
-  String? _tag;
-
-  List<DictionaryEntry> _results = const [];
-  int _total = 0;
+  /// Monotonic token so stale async responses never paint over newer ones.
+  int _requestId = 0;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_onScroll);
-    final initial = widget.dict.searchPaged(_currentQuery(offset: 0));
-    _results = initial.items;
-    _total = initial.total;
+    final preferred =
+        context.read<LanguageController>().settings.translationLanguage;
+    _source = _english;
+    _target = TranslationLanguage.byCode(preferred.code) ?? _persian;
+    if (_target == _source) _target = _persian;
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
-    _scrollController.dispose();
     super.dispose();
-  }
-
-  void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
-      _loadMore();
-    }
-  }
-
-  DictionaryQuery _currentQuery({required int offset}) => DictionaryQuery(
-        query: _query,
-        levels: _level == null ? const [] : [_level!],
-        partsOfSpeech: _pos == null ? const [] : [_pos!],
-        tags: _tag == null ? const [] : [_tag!],
-        offset: offset,
-        limit: _pageSize,
-      );
-
-  void _reload() {
-    final result = widget.dict.searchPaged(_currentQuery(offset: 0));
-    setState(() {
-      _results = result.items;
-      _total = result.total;
-    });
-  }
-
-  void _loadMore() {
-    if (_results.length >= _total) return;
-    final result = widget.dict.searchPaged(_currentQuery(offset: _results.length));
-    setState(() {
-      _results = [..._results, ...result.items];
-      _total = result.total;
-    });
   }
 
   void _onSearchChanged(String value) {
     setState(() => _query = value);
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () {
-      if (mounted) _reload();
-    });
+    _debounce = Timer(const Duration(milliseconds: 400), _runLookup);
   }
 
-  void _setLevel(String? level) {
+  void _clearSearch() {
     _debounce?.cancel();
-    setState(() => _level = level);
-    _reload();
-  }
-
-  void _setPos(String? pos) {
-    _debounce?.cancel();
-    setState(() => _pos = pos);
-    _reload();
-  }
-
-  void _setTag(String? tag) {
-    _debounce?.cancel();
-    setState(() => _tag = tag);
-    _reload();
-  }
-
-  void _clearFilters() {
-    _debounce?.cancel();
+    _requestId++;
     _searchController.clear();
     setState(() {
       _query = '';
-      _level = null;
-      _pos = null;
-      _tag = null;
+      _result = null;
+      _error = null;
+      _loading = false;
     });
-    _reload();
   }
 
-  bool get _hasActiveFilters =>
-      _level != null || _pos != null || _tag != null || _query.isNotEmpty;
+  void _changeSource(TranslationLanguage language) {
+    setState(() {
+      _source = language;
+      if (_source == _target) _target = _otherOf(language);
+    });
+    if (_query.isNotEmpty) _runLookup();
+  }
 
-  bool get _hasMore => _results.length < _total;
+  void _changeTarget(TranslationLanguage language) {
+    setState(() {
+      _target = language;
+      if (_target == _source) _source = _otherOf(language);
+    });
+    if (_query.isNotEmpty) _runLookup();
+  }
+
+  void _swap() {
+    setState(() {
+      final previous = _source;
+      _source = _target;
+      _target = previous;
+    });
+    if (_query.isNotEmpty) _runLookup();
+  }
+
+  TranslationLanguage _otherOf(TranslationLanguage language) =>
+      language == _english ? _persian : _english;
+
+  Future<void> _runLookup() async {
+    final query = _searchController.text.trim();
+    final id = ++_requestId;
+    if (query.isEmpty) {
+      setState(() {
+        _result = null;
+        _error = null;
+        _loading = false;
+      });
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final result = await TranslationService.instance.lookup(
+        word: query,
+        source: _source.code,
+        target: _target.code,
+      );
+      if (!mounted || id != _requestId) return;
+      setState(() {
+        _result = result;
+        _loading = false;
+      });
+    } on TranslationException catch (error) {
+      if (!mounted || id != _requestId) return;
+      setState(() {
+        _error = error;
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final dict = widget.dict;
-    final posOptions = _posOptions(dict);
-    final tagOptions = _tagOptions(dict);
-
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -212,46 +161,40 @@ class _DictionaryBodyState extends State<_DictionaryBody> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    '${dict.wordCount} words · ${widget.languageLabel}',
-                    style: const TextStyle(color: ZovaColors.textSecondary),
+                  const Text(
+                    'Live lookups for any language pair — translations, '
+                    'genders and examples are fetched on demand.',
+                    style: TextStyle(
+                      color: ZovaColors.textSecondary,
+                      height: 1.4,
+                    ),
                   ),
                   const SizedBox(height: 12),
-                  SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(
-                        value: false,
-                        label: Text('English'),
-                        icon: Icon(Icons.translate, size: 18),
-                      ),
-                      ButtonSegment(
-                        value: true,
-                        label: Text('German'),
-                        icon: Icon(Icons.translate, size: 18),
-                      ),
-                    ],
-                    selected: {widget.isGerman},
-                    onSelectionChanged: (selection) =>
-                        widget.onLanguageChanged(selection.first),
-                    style: ButtonStyle(
-                      visualDensity: VisualDensity.compact,
-                      textStyle: WidgetStateProperty.all(
-                        const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _LanguagePicker(
+                          label: 'From',
+                          value: _source,
+                          onChanged: _changeSource,
                         ),
                       ),
-                      backgroundColor: WidgetStateProperty.resolveWith(
-                        (states) => states.contains(WidgetState.selected)
-                            ? ZovaColors.primary
-                            : ZovaColors.surface,
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: 'Swap languages',
+                        onPressed: _swap,
+                        icon: const Icon(Icons.swap_horiz),
+                        color: ZovaColors.primary,
                       ),
-                      foregroundColor: WidgetStateProperty.resolveWith(
-                        (states) => states.contains(WidgetState.selected)
-                            ? Colors.white
-                            : ZovaColors.textSecondary,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _LanguagePicker(
+                          label: 'To',
+                          value: _target,
+                          onChanged: _changeTarget,
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -262,19 +205,15 @@ class _DictionaryBodyState extends State<_DictionaryBody> {
                 controller: _searchController,
                 onChanged: _onSearchChanged,
                 textInputAction: TextInputAction.search,
+                onSubmitted: (_) => _runLookup(),
                 decoration: InputDecoration(
-                  hintText: 'Search a word or meaning…',
+                  hintText: 'Search a word…',
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: _query.isEmpty
                       ? null
                       : IconButton(
                           icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _query = '');
-                            _debounce?.cancel();
-                            _reload();
-                          },
+                          onPressed: _clearSearch,
                         ),
                   filled: true,
                   fillColor: ZovaColors.surface,
@@ -286,425 +225,340 @@ class _DictionaryBodyState extends State<_DictionaryBody> {
               ),
             ),
             const SizedBox(height: 12),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                children: [
-                  _LevelFilterChip(
-                    label: 'All',
-                    count: dict.wordCount,
-                    selected: _level == null,
-                    onTap: () => _setLevel(null),
-                  ),
-                  for (final level in kCefrLevels) ...[
-                    const SizedBox(width: 8),
-                    _LevelFilterChip(
-                      label: level,
-                      count: dict.countForLevel(level),
-                      selected: _level == level,
-                      onTap: () => _setLevel(level),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _FilterDropdown<String?>(
-                      label: 'Part of speech',
-                      icon: Icons.tag,
-                      value: _pos,
-                      options: posOptions,
-                      onChanged: (value) =>
-                          _setPos(value == _allSentinel ? null : value),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _FilterDropdown<String?>(
-                      label: 'Topic',
-                      icon: Icons.topic_outlined,
-                      value: _tag,
-                      options: tagOptions,
-                      onChanged: (value) =>
-                          _setTag(value == _allSentinel ? null : value),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                children: [
-                  Text(
-                    '$_total result${_total == 1 ? '' : 's'}',                    style: const TextStyle(
-                      color: ZovaColors.textSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (_hasActiveFilters)
-                    TextButton(
-                      onPressed: _clearFilters,
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        foregroundColor: ZovaColors.primary,
-                      ),
-                      child: const Text('Clear filters'),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 4),
-            Expanded(
-              child: _results.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No words match your search.',
-                        style: TextStyle(color: ZovaColors.textSecondary),
-                      ),
-                    )
-                  : ListView.separated(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                      itemCount: _results.length + (_hasMore ? 1 : 0),
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        if (index >= _results.length) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                            child: Center(
-                              child: SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(strokeWidth: 2.5),
-                              ),
-                            ),
-                          );
-                        }
-                        final entry = _results[index];
-                        return _EntryCard(
-                          entry: entry,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => EntryDetailScreen(entry: entry),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-            ),
+            Expanded(child: _buildResultArea()),
           ],
         ),
       ),
     );
   }
 
-  static const String _allSentinel = '__all__';
-
-  /// All parts of speech as `label: key` dropdown options, sorted by count.
-  List<(String, String)> _posOptions(DictionaryService dict) {
-    final keys = dict.posKeys.toList()..sort();
-    return [
-      ('All', _allSentinel),
-      for (final key in keys) ('$key (${dict.countForPos(key)})', key),
-    ];
-  }
-
-  /// Up to 20 most common topic/tag options, sorted by count.
-  List<(String, String)> _tagOptions(DictionaryService dict) {
-    final ranked = dict.tagKeys.toList()
-      ..sort((a, b) {
-        final byCount = dict.countForTag(b).compareTo(dict.countForTag(a));
-        return byCount != 0 ? byCount : a.compareTo(b);
-      });
-    return [
-      ('All', _allSentinel),
-      for (final key in ranked.take(20)) ('$key (${dict.countForTag(key)})', key),
-    ];
+  Widget _buildResultArea() {
+    if (_query.isEmpty) {
+      return const _IdleHint();
+    }
+    if (_loading) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(strokeWidth: 3),
+            SizedBox(height: 14),
+            Text(
+              'Translating…',
+              style: TextStyle(color: ZovaColors.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_error != null) {
+      return _ErrorState(message: _error!.message, onRetry: _runLookup);
+    }
+    final result = _result;
+    if (result == null) {
+      return const _IdleHint();
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+      children: [
+        Row(
+          children: [
+            Text(
+              '${_source.label} → ${_target.label}',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: ZovaColors.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            _StatusChip(
+              label: result.fromCache ? 'Cached' : 'Live',
+              live: !result.fromCache,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _ResultCard(
+          result: result,
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => EntryDetailScreen(result: result),
+              ),
+            );
+          },
+        ),
+      ],
+    );
   }
 }
 
-/// Standalone drop-down row used for the part-of-speech and topic filters.
-class _FilterDropdown<T> extends StatelessWidget {
-  const _FilterDropdown({
+class _LanguagePicker extends StatelessWidget {
+  const _LanguagePicker({
     required this.label,
-    required this.icon,
     required this.value,
-    required this.options,
     required this.onChanged,
   });
-  final String label;
-  final IconData icon;
-  final T value;
 
-  /// `(label, key)` pairs; the key is what [onChanged] receives.
-  final List<(String, String)> options;
-  final ValueChanged<T?> onChanged;
+  final String label;
+  final TranslationLanguage value;
+  final ValueChanged<TranslationLanguage> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    var selectedLabel = label;
-    for (final (labelText, key) in options) {
-      if (key == value) {
-        selectedLabel = labelText;
-        break;
-      }
-    }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: ZovaColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: ZovaColors.textSecondary.withValues(alpha: 0.15)),
+        border: Border.all(
+          color: ZovaColors.textSecondary.withValues(alpha: 0.15),
+        ),
       ),
       child: DropdownButtonHideUnderline(
-        child: DropdownButton<T>(
+        child: DropdownButton<TranslationLanguage>(
           isExpanded: true,
           value: value,
           icon: const Icon(Icons.arrow_drop_down),
-          hint: Row(
-            children: [
-              Icon(icon, size: 16, color: ZovaColors.textSecondary),
-              const SizedBox(width: 6),
-              Text(
-                selectedLabel,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: ZovaColors.textPrimary,
+          hint: Text(label),
+          items: [
+            for (final language in kTranslationLanguages)
+              DropdownMenuItem<TranslationLanguage>(
+                value: language,
+                child: Text(
+                  '${language.label} (${language.code})',
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ],
-          ),
-          items: [
-            for (final (labelText, key) in options)
-              DropdownMenuItem<T>(
-                value: key as T,
-                child: Text(labelText, overflow: TextOverflow.ellipsis),
-              ),
           ],
-          onChanged: onChanged,
+          onChanged: (language) {
+            if (language != null) onChanged(language);
+          },
         ),
       ),
     );
   }
 }
 
-class _LevelFilterChip extends StatelessWidget {
-  const _LevelFilterChip({
-    required this.label,
-    required this.count,
-    required this.selected,
-    required this.onTap,
-  });
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.label, required this.live});
 
   final String label;
-  final int count;
-  final bool selected;
-  final VoidCallback onTap;
+  final bool live;
 
   @override
   Widget build(BuildContext context) {
-    final color = switch (label) {
-      'A1' => ZovaColors.success,
-      'A2' => ZovaColors.primary,
-      'B1' => ZovaColors.warning,
-      'B2' => ZovaColors.info,
-      'C1' => ZovaColors.secondary,
-      'C2' => ZovaColors.error,
-      _ => ZovaColors.textSecondary,
-    };
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? color : ZovaColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? color : ZovaColors.textSecondary.withValues(alpha: 0.2),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? Colors.white : ZovaColors.textPrimary,
-                fontWeight: FontWeight.w800,
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              '$count',
-              style: TextStyle(
-                color: selected
-                    ? Colors.white.withValues(alpha: 0.9)
-                    : ZovaColors.textSecondary,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EntryCard extends StatelessWidget {
-  const _EntryCard({required this.entry, required this.onTap});
-
-  final DictionaryEntry entry;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final code =
-        context.watch<LanguageController>().settings.translationLanguage.code;
-    final primary = entry.translationIn(code);
-    final secondary = code == 'fa' ? entry.englishTranslation : entry.translation;
-
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          entry.word,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            color: ZovaColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          entry.gender == null
-                              ? entry.partOfSpeech
-                              : '${entry.gender} · ${entry.partOfSpeech}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic,
-                            color: ZovaColors.textSecondary.withValues(
-                              alpha: 0.8,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      primary,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: ZovaColors.secondary,
-                      ),
-                    ),
-                    if (secondary.isNotEmpty && secondary != primary) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        secondary,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: ZovaColors.textSecondary.withValues(
-                            alpha: 0.9,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              _LevelChip(level: entry.level),
-              const SizedBox(width: 4),
-              const Icon(Icons.chevron_right, color: ZovaColors.textSecondary),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Small CEFR badge used on cards and in the detail view.
-class _LevelChip extends StatelessWidget {
-  const _LevelChip({required this.level});
-
-  final String level;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = switch (level) {
-      'A1' => ZovaColors.success,
-      'A2' => ZovaColors.primary,
-      'B1' => ZovaColors.warning,
-      'B2' => ZovaColors.info,
-      'C1' => ZovaColors.secondary,
-      'C2' => ZovaColors.error,
-      _ => ZovaColors.warning,
-    };
+    final color = live ? ZovaColors.success : ZovaColors.warning;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        level,
+        label,
         style: TextStyle(
           color: color,
+          fontSize: 11,
           fontWeight: FontWeight.w800,
-          fontSize: 12,
         ),
       ),
     );
   }
 }
 
-/// Full-screen detail for a single dictionary entry.
-class EntryDetailScreen extends StatelessWidget {
-  const EntryDetailScreen({super.key, required this.entry});
+class _IdleHint extends StatelessWidget {
+  const _IdleHint();
 
-  final DictionaryEntry entry;
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.translate, color: ZovaColors.textSecondary, size: 44),
+            SizedBox(height: 14),
+            Text(
+              'Type any word to translate it.',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: ZovaColors.textPrimary,
+              ),
+            ),
+            SizedBox(height: 6),
+            Text(
+              'Results are cached on-device, so you can re-open recent '
+              'lookups even offline.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: ZovaColors.textSecondary, height: 1.4),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.wifi_off, color: ZovaColors.error, size: 44),
+            const SizedBox(height: 14),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: ZovaColors.textPrimary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onRetry,
+              style: FilledButton.styleFrom(
+                backgroundColor: ZovaColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Try again'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ResultCard extends StatelessWidget {
+  const _ResultCard({required this.result, required this.onTap});
+
+  final TranslationResult result;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final rtl = result.isRtl;
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      result.word,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: ZovaColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (result.glossLine != null)
+                    Text(
+                      result.glossLine!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                        color: ZovaColors.textSecondary.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right, color: ZovaColors.textSecondary),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                result.translation,
+                textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: ZovaColors.secondary,
+                ),
+              ),
+              if (result.alternates.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final alt in result.alternates)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: ZovaColors.surfaceRaised,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          alt,
+                          textDirection:
+                              rtl ? TextDirection.rtl : TextDirection.ltr,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: ZovaColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              if (result.example != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  '“${result.example}”',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: ZovaColors.textPrimary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Full-screen detail for a dynamic translation result.
+class EntryDetailScreen extends StatelessWidget {
+  const EntryDetailScreen({super.key, required this.result});
+
+  final TranslationResult result;
 
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AppController>();
-    final isSaved = controller.progress.savedWords.contains(entry.word);
-    final inLeitner = controller.progress.leitnerBoxes.containsKey(entry.word);
-    final code =
-        context.watch<LanguageController>().settings.translationLanguage.code;
-    final meaning = entry.definitionIn(code);
+    final isSaved = controller.progress.savedWords.contains(result.word);
+    final inLeitner = controller.progress.leitnerBoxes.containsKey(result.word);
+    final rtl = result.isRtl;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(entry.word, style: const TextStyle(fontSize: 18)),
+        title: Text(result.word, style: const TextStyle(fontSize: 18)),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -718,19 +572,19 @@ class EntryDetailScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        entry.word,
+                        result.word,
                         style: const TextStyle(
                           fontSize: 30,
                           fontWeight: FontWeight.w800,
                           color: ZovaColors.textPrimary,
                         ),
                       ),
-                      if (entry.phonetic != null) ...[
+                      if (result.glossLine != null) ...[
                         const SizedBox(height: 4),
                         Text(
-                          entry.phonetic!,
+                          result.glossLine!,
                           style: const TextStyle(
-                            fontSize: 14,
+                            fontStyle: FontStyle.italic,
                             color: ZovaColors.textSecondary,
                           ),
                         ),
@@ -738,18 +592,11 @@ class EntryDetailScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                _LevelChip(level: entry.level),
+                _StatusChip(
+                  label: result.fromCache ? 'Cached' : 'Live',
+                  live: !result.fromCache,
+                ),
               ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              entry.gender == null
-                  ? entry.partOfSpeech
-                  : '${entry.gender} · ${entry.partOfSpeech}',
-              style: const TextStyle(
-                fontStyle: FontStyle.italic,
-                color: ZovaColors.textSecondary,
-              ),
             ),
             const SizedBox(height: 18),
             Container(
@@ -760,10 +607,8 @@ class EntryDetailScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Text(
-                entry.translationIn(code),
-                textDirection: code == 'fa'
-                    ? TextDirection.rtl
-                    : TextDirection.ltr,
+                result.translation,
+                textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
@@ -771,7 +616,8 @@ class EntryDetailScreen extends StatelessWidget {
                 ),
               ),
             ),
-            if (meaning.isNotEmpty && meaning != entry.translationIn(code)) ...[
+            if (result.definition != null &&
+                result.definition!.isNotEmpty) ...[
               const SizedBox(height: 18),
               const Text(
                 'Meaning',
@@ -783,14 +629,49 @@ class EntryDetailScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                meaning,
-                textDirection:
-                    code == 'fa' ? TextDirection.rtl : TextDirection.ltr,
+                result.definition!,
+                textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
                 style: const TextStyle(
                   fontSize: 16,
                   height: 1.5,
                   color: ZovaColors.textPrimary,
                 ),
+              ),
+            ],
+            if (result.alternates.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              const Text(
+                'Other translations',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: ZovaColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final alt in result.alternates)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: ZovaColors.surfaceRaised,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        alt,
+                        textDirection:
+                            rtl ? TextDirection.rtl : TextDirection.ltr,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: ZovaColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
             const SizedBox(height: 18),
@@ -806,9 +687,9 @@ class EntryDetailScreen extends StatelessWidget {
                     ),
                     onPressed: () {
                       if (isSaved) {
-                        controller.removeSavedWord(entry.word);
+                        controller.removeSavedWord(result.word);
                       } else {
-                        controller.saveWord(entry.word);
+                        controller.saveWord(result.word);
                       }
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -837,7 +718,7 @@ class EntryDetailScreen extends StatelessWidget {
                     onPressed: inLeitner
                         ? null
                         : () {
-                            controller.addToLeitner(entry.word);
+                            controller.addToLeitner(result.word);
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Added to Leitner Box'),
@@ -850,39 +731,41 @@ class EntryDetailScreen extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 18),
-            const Text(
-              'Example',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: ZovaColors.textSecondary,
+            if (result.example != null) ...[
+              const SizedBox(height: 18),
+              const Text(
+                'Example',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: ZovaColors.textSecondary,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '“${entry.example}”',
-              style: const TextStyle(
-                fontSize: 17,
-                height: 1.5,
-                color: ZovaColors.textPrimary,
+              const SizedBox(height: 8),
+              Text(
+                '“${result.example}”',
+                style: const TextStyle(
+                  fontSize: 17,
+                  height: 1.5,
+                  color: ZovaColors.textPrimary,
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              entry.exampleIn(code),
-              textDirection: code == 'fa'
-                  ? TextDirection.rtl
-                  : TextDirection.ltr,
-              style: const TextStyle(
-                fontSize: 16,
-                height: 1.5,
-                color: ZovaColors.textSecondary,
-              ),
-            ),
+              if (result.exampleTranslation != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  result.exampleTranslation!,
+                  textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    height: 1.5,
+                    color: ZovaColors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
             const SizedBox(height: 24),
             const Text(
-              'Learn it in a course',
+              'Practice it',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
@@ -891,8 +774,8 @@ class EntryDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'This word appears in the A1-B2 course lessons, so you can '
-              'practice it with flashcards, matching games and quizzes.',
+              'Save this word to "My Words" or drop it into a Leitner box to '
+              'review it with flashcards until you never forget it.',
               style: TextStyle(
                 fontSize: 14,
                 height: 1.5,

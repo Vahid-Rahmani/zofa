@@ -34,6 +34,24 @@ class EnvConfig {
     defaultValue: '',
   );
 
+  /// Optional custom translation endpoint for the dynamic dictionary bridge.
+  ///
+  /// When set, the app POSTs `{"word": ..., "source": ..., "target": ...}` to
+  /// this URL and expects a JSON object with a `translation` field (plus
+  /// optional `part_of_speech`, `gender`, `definition`, `example`,
+  /// `example_translation`, `alternates`). Point it at a self-hosted LLM
+  /// proxy to replace the free Google/Wiktionary provider.
+  static const String translationEndpoint = String.fromEnvironment(
+    'ZOVA_TRANSLATION_ENDPOINT',
+    defaultValue: '',
+  );
+
+  /// Optional bearer token sent to [translationEndpoint].
+  static const String translationApiKey = String.fromEnvironment(
+    'ZOVA_TRANSLATION_API_KEY',
+    defaultValue: '',
+  );
+
   static String get appName => _appName;
 
   /// Whether a real Supabase backend is configured.
@@ -42,6 +60,9 @@ class EnvConfig {
 
   /// Whether Stripe is configured.
   static bool get hasStripe => stripePublishableKey.isNotEmpty;
+
+  /// Whether a custom translation bridge endpoint is configured.
+  static bool get hasTranslationEndpoint => translationEndpoint.isNotEmpty;
 
   /// The app uses a local demo backend when no remote services are set up.
   static bool get isDemoMode => !hasSupabase;

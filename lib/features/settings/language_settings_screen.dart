@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/state/language_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../data/models/language_settings.dart';
+import '../../data/services/translation_service.dart';
 
 /// Lets the learner set, independently, the interface language and the
 /// preferred translation/explanation language (both English or Persian).
@@ -79,6 +80,41 @@ class LanguageSettingsScreen extends StatelessWidget {
               code: AppLanguage.english.code,
               selected: settings.translationLanguage == AppLanguage.english,
               onTap: () => controller.setTranslationLanguage(AppLanguage.english),
+            ),
+            const SizedBox(height: 28),
+            const Text(
+              'Dictionary cache',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: ZovaColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Lookups are cached on-device so recently viewed words open '
+              'instantly and work offline.',
+              style: TextStyle(color: ZovaColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 50),
+                ),
+                onPressed: () async {
+                  await TranslationService.instance.clearCache();
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Cached translations cleared'),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.delete_sweep_outlined, size: 20),
+                label: const Text('Clear cached translations'),
+              ),
             ),
           ],
         ),

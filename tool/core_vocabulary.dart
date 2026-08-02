@@ -152,7 +152,7 @@ void main(List<String> args) {
   final deDuplicates = _duplicates(allDe);
   if (enDuplicates.isNotEmpty || deDuplicates.isNotEmpty) {
     stderr.writeln(
-        'DUPLICATE HEADWORDS FAIL: english=${enDuplicates} german=$deDuplicates');
+        'DUPLICATE HEADWORDS FAIL: english=$enDuplicates german=$deDuplicates');
     exit(1);
   }
   stdout.writeln('headwords: OK (unique per dictionary)');

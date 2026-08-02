@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
+import '../../core/state/language_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../data/models/book.dart';
-import '../../data/services/dictionary.dart';
-import '../../data/services/dictionary_service.dart';
+import '../../data/models/translation_result.dart';
+import '../../data/services/translation_service.dart';
 
 /// Interactive reader: paragraphs are rendered as tappable text so the user
-/// can look up any word and grow their vocabulary while reading. A toggle
-/// switches between the English text and its Persian translation.
+/// can look up any word (through the live translation bridge) and grow their
+/// vocabulary while reading. A toggle switches between the English text and
+/// its Persian translation.
 class ReaderScreen extends StatefulWidget {
   const ReaderScreen({super.key, required this.book});
 
@@ -24,16 +26,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
   late final PageController _pageController;
   bool _showPersian = false;
 
-  /// The loaded dictionary, once available. Drives which words are highlighted
-  /// as tappable look-ups in the reader.
-  DictionaryService? _dict;
-
   @override
   void initState() {
     super.initState();
-    Dictionary.service.then((dict) {
-      if (mounted) setState(() => _dict = dict);
-    });
     final controller = context.read<AppController>();
     _chapterIndex =
         (controller.progress.bookProgress[widget.book.id] ?? 0)
@@ -55,103 +50,19 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Future<void> _showWordSheet(String word) async {
-    final dict = await Dictionary.service;
-    final entry = dict.lookup(word);
-    if (!mounted) return;
+    final languageCode = context
+        .read<LanguageController>()
+        .settings
+        .translationLanguage
+        .code;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: ZovaColors.surfaceRaised,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(28, 24, 28, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    word,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: ZovaColors.textPrimary,
-                    ),
-                  ),
-                ),
-                if (entry != null) _LevelPill(level: entry.level),
-              ],
-            ),
-            if (entry?.phonetic != null) ...[
-              const SizedBox(height: 2),
-              Text(
-                entry!.phonetic!,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: ZovaColors.textSecondary,
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            Text(
-              entry?.translation ?? 'Not in the dictionary yet.',
-              textDirection: entry == null ? null : TextDirection.rtl,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: entry == null
-                    ? ZovaColors.textSecondary
-                    : ZovaColors.primary,
-              ),
-            ),
-            if (entry != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: ZovaColors.surface,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '“${entry.example}”',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        height: 1.5,
-                        color: ZovaColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      entry.exampleTranslation,
-                      textDirection: TextDirection.rtl,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.5,
-                        color: ZovaColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            Text(
-              'Tap any English word in the story to see its meaning.',
-              style: TextStyle(
-                fontSize: 12,
-                color: ZovaColors.textSecondary.withValues(alpha: 0.7),
-              ),
-            ),
-          ],
-        ),
-      ),
+      builder: (context) =>
+          _WordLookupSheet(word: word, languageCode: languageCode),
     );
   }
 
@@ -203,7 +114,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
               chapter: widget.book.chapters[chapterIndex],
               onWordTap: _showWordSheet,
               showPersian: _showPersian,
-              dict: _dict,
             );
           },
         ),
@@ -228,32 +138,216 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 }
 
-class _LevelPill extends StatelessWidget {
-  const _LevelPill({required this.level});
+/// Bottom sheet that looks a word up live through the [TranslationService],
+/// showing a loading indicator while the provider answers and an error state
+/// with retry when offline.
+class _WordLookupSheet extends StatefulWidget {
+  const _WordLookupSheet({required this.word, required this.languageCode});
 
-  final String level;
+  final String word;
+  final String languageCode;
+
+  @override
+  State<_WordLookupSheet> createState() => _WordLookupSheetState();
+}
+
+class _WordLookupSheetState extends State<_WordLookupSheet> {
+  TranslationResult? _result;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _lookup();
+  }
+
+  Future<void> _lookup() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final result = await TranslationService.instance.lookupAnySource(
+        word: widget.word,
+        target: widget.languageCode,
+      );
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        if (result == null) {
+          _error = 'No translation found for "${widget.word}".';
+        } else {
+          _result = result;
+        }
+      });
+    } on TranslationException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error.message;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final color = switch (level) {
-      'A1' => ZovaColors.success,
-      'A2' => ZovaColors.primary,
-      _ => ZovaColors.warning,
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 24, 28, 32),
+      child: SafeArea(
+        child: _loading
+            ? SizedBox(
+                height: 160,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(strokeWidth: 3),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Looking up “${widget.word}”…',
+                        style: const TextStyle(color: ZovaColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : _error != null
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.word,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: ZovaColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _error!,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          height: 1.4,
+                          color: ZovaColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      FilledButton.icon(
+                        onPressed: _lookup,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: ZovaColors.primary,
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('Try again'),
+                      ),
+                    ],
+                  )
+                : _resultContent(context),
       ),
-      child: Text(
-        level,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w800,
-          fontSize: 12,
+    );
+  }
+
+  Widget _resultContent(BuildContext context) {
+    final result = _result!;
+    final rtl = result.isRtl;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                result.word,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: ZovaColors.textPrimary,
+                ),
+              ),
+            ),
+            if (result.glossLine != null)
+              Text(
+                result.glossLine!,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontStyle: FontStyle.italic,
+                  color: ZovaColors.textSecondary,
+                ),
+              ),
+          ],
         ),
-      ),
+        const SizedBox(height: 8),
+        Text(
+          result.translation,
+          textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: ZovaColors.primary,
+          ),
+        ),
+        if (result.definition != null && result.definition!.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text(
+            result.definition!,
+            textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              color: ZovaColors.textSecondary,
+            ),
+          ),
+        ],
+        if (result.example != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: ZovaColors.surface,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '“${result.example}”',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: ZovaColors.textPrimary,
+                  ),
+                ),
+                if (result.exampleTranslation != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    result.exampleTranslation!,
+                    textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      height: 1.5,
+                      color: ZovaColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Text(
+          'Tap any word in the story to see its meaning.',
+          style: TextStyle(
+            fontSize: 12,
+            color: ZovaColors.textSecondary.withValues(alpha: 0.7),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -263,13 +357,11 @@ class _ParagraphPage extends StatelessWidget {
     required this.chapter,
     required this.onWordTap,
     required this.showPersian,
-    required this.dict,
   });
 
   final BookChapter chapter;
   final ValueChanged<String> onWordTap;
   final bool showPersian;
-  final DictionaryService? dict;
 
   @override
   Widget build(BuildContext context) {
@@ -322,7 +414,6 @@ class _ParagraphPage extends StatelessWidget {
                 child: _TappableParagraph(
                   text: paragraph.text,
                   onWordTap: onWordTap,
-                  dict: dict,
                 ),
               ),
         ],
@@ -335,12 +426,10 @@ class _TappableParagraph extends StatelessWidget {
   const _TappableParagraph({
     required this.text,
     required this.onWordTap,
-    required this.dict,
   });
 
   final String text;
   final ValueChanged<String> onWordTap;
-  final DictionaryService? dict;
 
   @override
   Widget build(BuildContext context) {
@@ -358,7 +447,6 @@ class _TappableParagraph extends StatelessWidget {
               ),
             );
           }
-          final hasTranslation = dict?.lookup(token.word) != null;
           return WidgetSpan(
             child: GestureDetector(
               onTap: () => onWordTap(token.word),
@@ -367,9 +455,11 @@ class _TappableParagraph extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 18,
                   height: 1.6,
-                  color:
-                      hasTranslation ? ZovaColors.secondary : ZovaColors.textPrimary,
-                  fontWeight: hasTranslation ? FontWeight.w700 : FontWeight.w400,
+                  color: ZovaColors.secondary,
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.underline,
+                  decorationColor: ZovaColors.secondary.withValues(alpha: 0.4),
+                  decorationThickness: 1.2,
                 ),
               ),
             ),
