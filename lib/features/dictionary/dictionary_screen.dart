@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
+import '../../core/state/language_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../data/models/dictionary_entry.dart';
 import '../../data/services/dictionary.dart';
@@ -27,11 +28,10 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   late final Future<DictionaryService> _english = Dictionary.service;
   late final Future<DictionaryService> _german = GermanDictionary.service;
 
-  String get _languageLabel =>
-      _isGerman ? 'German → Persian' : 'English → Persian';
-
   @override
   Widget build(BuildContext context) {
+    final language = context.watch<LanguageController>();
+    final translationLanguage = language.settings.translationLanguage;
     final future = _isGerman ? _german : _english;
     return FutureBuilder<DictionaryService>(
       future: future,
@@ -44,7 +44,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
         return _DictionaryBody(
           key: ValueKey(_isGerman),
           dict: snapshot.data!,
-          languageLabel: _languageLabel,
+          languageLabel:
+              '${_isGerman ? 'German' : 'English'} → ${translationLanguage.label}',
           isGerman: _isGerman,
           onLanguageChanged: (value) => setState(() => _isGerman = value),
         );
@@ -574,6 +575,11 @@ class _EntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final code =
+        context.watch<LanguageController>().settings.translationLanguage.code;
+    final primary = entry.translationIn(code);
+    final secondary = code == 'fa' ? entry.englishTranslation : entry.translation;
+
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
@@ -613,13 +619,25 @@ class _EntryCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      entry.translation,
+                      primary,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: ZovaColors.secondary,
                       ),
                     ),
+                    if (secondary.isNotEmpty && secondary != primary) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        secondary,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: ZovaColors.textSecondary.withValues(
+                            alpha: 0.9,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -680,6 +698,9 @@ class EntryDetailScreen extends StatelessWidget {
     final controller = context.watch<AppController>();
     final isSaved = controller.progress.savedWords.contains(entry.word);
     final inLeitner = controller.progress.leitnerBoxes.containsKey(entry.word);
+    final code =
+        context.watch<LanguageController>().settings.translationLanguage.code;
+    final meaning = entry.definitionIn(code);
 
     return Scaffold(
       appBar: AppBar(
@@ -739,7 +760,10 @@ class EntryDetailScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Text(
-                entry.translation,
+                entry.translationIn(code),
+                textDirection: code == 'fa'
+                    ? TextDirection.rtl
+                    : TextDirection.ltr,
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
@@ -747,6 +771,28 @@ class EntryDetailScreen extends StatelessWidget {
                 ),
               ),
             ),
+            if (meaning.isNotEmpty && meaning != entry.translationIn(code)) ...[
+              const SizedBox(height: 18),
+              const Text(
+                'Meaning',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: ZovaColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                meaning,
+                textDirection:
+                    code == 'fa' ? TextDirection.rtl : TextDirection.ltr,
+                style: const TextStyle(
+                  fontSize: 16,
+                  height: 1.5,
+                  color: ZovaColors.textPrimary,
+                ),
+              ),
+            ],
             const SizedBox(height: 18),
             Row(
               children: [
@@ -824,8 +870,10 @@ class EntryDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              entry.exampleTranslation,
-              textDirection: TextDirection.rtl,
+              entry.exampleIn(code),
+              textDirection: code == 'fa'
+                  ? TextDirection.rtl
+                  : TextDirection.ltr,
               style: const TextStyle(
                 fontSize: 16,
                 height: 1.5,

@@ -44,10 +44,20 @@ class LeitnerBoxScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Leitner Box')),
       body: SafeArea(
-        child: FutureBuilder<DictionaryService>(
-          future: Dictionary.service,
+        child: FutureBuilder<List<DictionaryService>>(
+          future: Future.wait([Dictionary.service, GermanDictionary.service]),
           builder: (context, snapshot) {
-            final dict = snapshot.data;
+            final dictionaries = snapshot.data;
+            final english = dictionaries?[0];
+            DictionaryEntry? resolve(String word) {
+              if (dictionaries == null) return null;
+              for (final dict in dictionaries) {
+                final entry = dict.lookup(word);
+                if (entry != null) return entry;
+              }
+              return null;
+            }
+
             return ListView(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
               children: [
@@ -67,9 +77,9 @@ class LeitnerBoxScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 18),
                 _BoxStatsCard(total: total, dueToday: dueToday),
-                if (dict != null) ...[
+                if (english != null) ...[
                   const SizedBox(height: 16),
-                  _WordPoolCard(dict: dict, controller: controller),
+                  _WordPoolCard(dict: english, controller: controller),
                 ],
                 const SizedBox(height: 24),
                 if (total == 0)
@@ -92,7 +102,7 @@ class LeitnerBoxScreen extends StatelessWidget {
                       dueToday: dueByBox[box] ?? 0,
                       words: boxes.entries
                           .where((e) => e.value == box)
-                          .map((e) => dict?.lookup(e.key))
+                          .map((e) => resolve(e.key))
                           .whereType<DictionaryEntry>()
                           .toList(),
                       onStudy: (words) {

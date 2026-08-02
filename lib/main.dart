@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'app.dart';
 import 'core/state/app_controller.dart';
+import 'core/state/language_controller.dart';
 import 'data/services/remote_api.dart';
 import 'data/services/stripe_service.dart';
 
@@ -14,9 +15,15 @@ Future<void> main() async {
   await RemoteApi.instance.init();
   await StripeService.instance.init();
 
+  final language = LanguageController();
+  await language.bootstrap();
+
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AppController(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppController(language: language)),
+        ChangeNotifierProvider.value(value: language),
+      ],
       child: const ZovaApp(),
     ),
   );

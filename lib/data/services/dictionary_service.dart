@@ -151,6 +151,17 @@ class DictionaryService {
   /// present, otherwise the slug of the headword). O(1).
   DictionaryEntry? byId(String id) => _byId[id];
 
+  late final Map<String, DictionaryEntry> _byConcept = {
+    for (final e in _entries) e.effectiveConcept: e,
+  };
+
+  /// Looks up an entry by its shared [DictionaryEntry.concept] id, which links
+  /// the same idea across target-language dictionaries. O(1).
+  DictionaryEntry? byConcept(String concept) => _byConcept[concept];
+
+  /// Whether an entry for [concept] exists in this dictionary.
+  bool hasConcept(String concept) => _byConcept.containsKey(concept);
+
   /// Convenience: the translation of [word], when known.
   String? translation(String word) => lookup(word)?.translation;
 
@@ -171,18 +182,14 @@ class DictionaryService {
   List<DictionaryEntry> byTag(String tag) => List.unmodifiable(
       [for (final p in _index.positionsForTag(tag)) _entries[p]]);
 
-  /// Fuzzy search across headwords, translations and examples. Works for
-  /// Latin and Persian queries alike. Linear scan kept for compatibility with
-  /// small datasets; use [searchPaged] for paginated, indexed queries.
+  /// Fuzzy search across headwords, translations (Persian and English),
+  /// definitions and examples. Works for Latin and Persian queries alike.
+  /// Linear scan kept for compatibility with small datasets; use
+  /// [searchPaged] for paginated, indexed queries.
   List<DictionaryEntry> search(String query) {
     final q = normalizeText(query);
     if (q.isEmpty) return all;
-    return List.unmodifiable(
-      _entries.where((e) =>
-          normalizeText(e.word).contains(q) ||
-          e.translation.contains(q) ||
-          normalizeText(e.example).contains(q)),
-    );
+    return List.unmodifiable(_entries.where((e) => _matchesText(e, q)));
   }
 
   /// Paginated, filtered search for the Dictionary UI.
@@ -243,8 +250,13 @@ class DictionaryService {
 
   bool _matchesText(DictionaryEntry entry, String q) =>
       normalizeText(entry.word).contains(q) ||
-      entry.translation.contains(q) ||
-      normalizeText(entry.example).contains(q);
+      normalizeText(entry.translation).contains(q) ||
+      normalizeText(entry.englishTranslation).contains(q) ||
+      normalizeText(entry.persianDefinition).contains(q) ||
+      normalizeText(entry.englishDefinition).contains(q) ||
+      normalizeText(entry.example).contains(q) ||
+      normalizeText(entry.persianExample).contains(q) ||
+      normalizeText(entry.englishExample).contains(q);
 }
 
 /// Inputs for the background-isolate pack parse.

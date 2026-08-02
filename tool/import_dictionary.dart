@@ -184,10 +184,17 @@ List<DictionaryEntry> _buildEntries(List<Map<String, dynamic>> raw) {
     entries.add(DictionaryEntry(
       word: word,
       translation: translation,
+      englishTranslation: row['english_translation'] as String? ?? '',
+      persianDefinition: row['persian_definition'] as String? ?? '',
+      englishDefinition: row['english_definition'] as String? ?? '',
+      persianExample: row['example_translation'] as String? ??
+          row['persian_example'] as String? ??
+          '',
+      englishExample: row['english_example'] as String? ?? '',
+      concept: row['concept'] as String?,
       partOfSpeech: pos,
       level: level,
       example: row['example'] as String? ?? '',
-      exampleTranslation: row['example_translation'] as String? ?? '',
       id: row['id'] as String?,
       lemma: row['lemma'] as String?,
       language: row['language'] as String?,

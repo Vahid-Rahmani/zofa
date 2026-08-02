@@ -98,9 +98,65 @@ Architectural decisions:
 - Single source of truth: `learning` map; `leitnerBoxes` is a compatibility
   view, so existing screens and saved data keep working.
 
+### Phase 3 — 3-way multilingual architecture (English <-> German <-> Persian)
+
+Status: **Complete** (implemented + verified; 69/69 tests green, analyze clean).
+
+- `DictionaryEntry` now models a full **3-way bridge**: `word` (target
+  headword), `translation` (canonical Persian gloss), `englishTranslation`
+  (English gloss), `persianDefinition` / `englishDefinition` (fuller meanings)
+  and `example` with `persianExample` / `englishExample` translations.
+  `translationIn(code)` / `definitionIn(code)` / `exampleIn(code)` pick the
+  explanation-language rendering; `exampleTranslation` / `persianTranslation`
+  remain as legacy read aliases and legacy JSON keys (`persian_translation`,
+  `example_translation`) migrate automatically. `english_translation` is now a
+  required field (validation + `tryParse`).
+- `concept` links the same idea across target dictionaries (`apple` /
+  `der Apfel`); `effectiveConcept` / `effectiveId` fall back to the headword
+  slug. `DictionaryService` gained `byConcept` / `hasConcept` and `search`
+  now scans glosses, definitions and example translations (Latin headword
+  queries still use the index prefix table).
+- `lib/data/models/language_settings.dart`: `AppLanguage` (`en` / `fa`) and
+  `LanguageSettings` with independent `uiLanguage` + `translationLanguage`,
+  `isRtlUi`, JSON round-trip.
+- `lib/core/state/language_controller.dart`: persisted language preferences
+  (loaded at boot from `LocalStore.getLanguageSettings`, saved on change).
+  Injected into `AppController` (exposed as `controller.language`) and
+  provided at the root; `ZovaApp` sets `MaterialApp.locale` and overrides
+  `Directionality` for RTL Persian UI.
+- `tool/core_vocabulary.dart`: idempotent symmetric corpus builder that merges
+  the parallel EN/DE dictionaries into the 3-way model (concept linking,
+  curated definitions, German supplements for missing counterparts, English
+  glosses/examples for German-only concepts). Hard checks fail the run on
+  asymmetry, non-round-tripping entries or duplicate headwords.
+- Regenerated assets: `english.json` (420) and `german.json` (430) plus both
+  `.index.json` sidecars — every entry carries word + Persian + English gloss,
+  definitions and example translations; German nouns keep their article.
+- UI: dictionary cards and detail (translation + meaning + example), My Words
+  and Leitner cards/review flashcard now render through
+  `translationIn`/`definitionIn`/`exampleIn`; My Words and Leitner resolve
+  saved words across **both** target dictionaries.
+- New `language_settings_screen.dart` (interface + translation language),
+  reachable from Profile.
+- Tests: new `test/language_settings_test.dart` (model/JSON, controller
+  persistence, settings screen); `dictionary_engine_test.dart` extended with
+  legacy-JSON migration and 3-way helper tests; widget/auth/dictionary tests
+  updated for the provider tree and broader search behaviour.
+
+Architectural decisions:
+
+- The learner's preferred *translation language* is a separate persisted
+  preference from the *interface language*, so a Persian speaker can keep a
+  Persian UI while reading English glosses (and vice versa).
+- "English" in the 3-way bridge means the target-dictionary language, not the
+  UI language; `translationIn` etc. render whichever explanation language is
+  chosen.
+- Supplements carry a `de-` id prefix and are never used as match partners, so
+  re-running the corpus tool is byte-stable and idempotent.
+
 ## Next phase
 
-### Phase 3 — Dashboard (next)
+### Phase 4 — Dashboard (next)
 
 Not started. Planned scope: progress overview (daily streak, words learned,
 due counts per box, per-level breakdown, recent activity), reading state from
@@ -108,15 +164,17 @@ due counts per box, per-level breakdown, recent activity), reading state from
 
 ## Remaining phases
 
-- **Phase 4 — Roadmap**: skill tree / level progression UI driven by learner
+- **Phase 5 — Roadmap**: skill tree / level progression UI driven by learner
   state.
-- **Phase 5 — Mini-games**: recall games reusing dictionary + learning state.
-- **Phase 6 — Multi-language**: Spanish / French / Italian dictionary packs and
+- **Phase 6 — Mini-games**: recall games reusing dictionary + learning state.
+- **Phase 7 — Multi-language**: Spanish / French / Italian dictionary packs and
   language selection.
 
 ## Known issues
 
 - Bundled English dictionary is a curated 420-entry seed (A1/B1 only); B2–C2
   buckets are empty until a larger dump is imported.
+- The reader (`books/reader_screen.dart`) still reads the legacy Persian
+  `exampleTranslation` alias; making it fully language-aware is deferred.
 - `android/app/build.gradle.kts` carries a pre-existing unrelated modification;
   it is excluded from commits.

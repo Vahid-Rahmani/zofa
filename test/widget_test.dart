@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zova/app.dart';
 import 'package:zova/core/state/app_controller.dart';
+import 'package:zova/core/state/language_controller.dart';
 import 'package:zova/features/splash/splash_screen.dart';
 
 void main() {
@@ -18,8 +19,11 @@ void main() {
     SharedPreferences.setMockInitialValues({});
 
     await tester.pumpWidget(
-      ChangeNotifierProvider(
-        create: (_) => AppController(),
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AppController()),
+          ChangeNotifierProvider(create: (_) => LanguageController()),
+        ],
         child: const ZovaApp(),
       ),
     );

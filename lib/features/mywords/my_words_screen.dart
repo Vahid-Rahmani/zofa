@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
+import '../../core/state/language_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../data/models/dictionary_entry.dart';
 import '../../data/services/dictionary.dart';
@@ -19,17 +20,23 @@ class MyWordsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('My Words')),
       body: SafeArea(
-        child: FutureBuilder<DictionaryService>(
-          future: Dictionary.service,
+        child: FutureBuilder<List<DictionaryService>>(
+          future: Future.wait([Dictionary.service, GermanDictionary.service]),
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
-            final dict = snapshot.data!;
-            final entries = [
-              for (final word in savedWords)
-                if (dict.lookup(word) != null) dict.lookup(word)!,
-            ];
+            final dictionaries = snapshot.data!;
+            final entries = <DictionaryEntry>[];
+            for (final word in savedWords) {
+              for (final dict in dictionaries) {
+                final entry = dict.lookup(word);
+                if (entry != null) {
+                  entries.add(entry);
+                  break;
+                }
+              }
+            }
 
             return ListView(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
@@ -168,6 +175,10 @@ class _WordCard extends StatelessWidget {
       'A2' => ZovaColors.primary,
       _ => ZovaColors.warning,
     };
+    final code =
+        context.watch<LanguageController>().settings.translationLanguage.code;
+    final primary = entry.translationIn(code);
+    final secondary = code == 'fa' ? entry.englishTranslation : entry.translation;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -215,13 +226,23 @@ class _WordCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  entry.translation,
+                  primary,
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: ZovaColors.secondary,
                   ),
                 ),
+                if (secondary.isNotEmpty && secondary != primary) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    secondary,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: ZovaColors.textSecondary.withValues(alpha: 0.9),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

@@ -84,7 +84,11 @@ void main() {
       final byPersian = dict.search('آب');
       expect(byPersian, isNotEmpty);
       expect(byPersian.any((e) => e.word == 'Wasser'), isTrue);
-      expect(byPersian.every((e) => e.translation.contains('آب')), isTrue);
+      expect(
+        byPersian.any((e) => e.translation.contains('آب')),
+        isTrue,
+        reason: 'translation matches must still surface',
+      );
       expect(byPersian.length, lessThan(dict.wordCount),
           reason: 'a Persian query should filter, not return everything');
       expect(dict.search(''), dict.all);

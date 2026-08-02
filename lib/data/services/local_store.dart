@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_user.dart';
+import '../models/language_settings.dart';
 import '../models/user_progress.dart';
 
 /// Local persistence used by the demo backend.
@@ -16,6 +17,7 @@ class LocalStore {
   static const _kUser = 'zova.user';
   static const _kProgress = 'zova.progress';
   static const _kOnboarded = 'zova.onboarded';
+  static const _kLanguage = 'zova.language';
 
   static Future<AppUser?> getUser() async {
     final prefs = await SharedPreferences.getInstance();
@@ -61,5 +63,21 @@ class LocalStore {
   static Future<void> setOnboarded(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kOnboarded, value);
+  }
+
+  static Future<LanguageSettings> getLanguageSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kLanguage);
+    if (raw == null) return const LanguageSettings();
+    try {
+      return LanguageSettings.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return const LanguageSettings();
+    }
+  }
+
+  static Future<void> saveLanguageSettings(LanguageSettings settings) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kLanguage, jsonEncode(settings.toJson()));
   }
 }

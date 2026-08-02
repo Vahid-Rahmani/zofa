@@ -60,11 +60,19 @@ void main() {
       expect(result.items.every((e) => e.word.startsWith('wa')), isTrue);
     });
 
-    test('Persian queries scan translations', () {
-      final result = dict.searchPaged(const DictionaryQuery(query: 'آب', limit: 20));
+    test('Persian queries scan translations, definitions and examples', () {
+      final result =
+          dict.searchPaged(const DictionaryQuery(query: 'آب', limit: 20));
       expect(result.total, greaterThanOrEqualTo(1));
-      expect(result.items.every((e) => e.translation.contains('آب')), isTrue);
       expect(result.items.any((e) => e.word == 'water'), isTrue);
+      final translationOnly =
+          dict.entries.where((e) => e.translation.contains('آب')).length;
+      expect(result.total, greaterThanOrEqualTo(translationOnly),
+          reason: 'search must still surface every translation match');
+      for (final e in result.items) {
+        expect(_matchesPersian(e, 'آب'), isTrue,
+            reason: '"${e.word}" should match آب in some field');
+      }
     });
 
     test('level + part-of-speech filters narrow results', () {
@@ -180,6 +188,7 @@ void main() {
         DictionaryEntry.tryParse({
           'word': 'hi',
           'translation': 'سلام',
+          'english_translation': 'hi',
           'part_of_speech': 'interjection',
           'level': 'A1',
         }),
@@ -192,6 +201,7 @@ void main() {
         {
           'word': 'good',
           'translation': 'خوب',
+          'english_translation': 'good',
           'part_of_speech': 'adjective',
           'level': 'A1',
         },
@@ -200,6 +210,7 @@ void main() {
         {
           'word': 'night',
           'translation': 'شب',
+          'english_translation': 'night',
           'part_of_speech': 'noun',
           'level': 'A1',
         },
@@ -216,12 +227,14 @@ void main() {
           'id': 'custom-id',
           'word': 'hello',
           'translation': 'سلام',
+          'english_translation': 'hello',
           'part_of_speech': 'interjection',
           'level': 'A1',
         },
         {
           'word': 'Good morning',
           'translation': 'صبح بخیر',
+          'english_translation': 'good morning',
           'part_of_speech': 'phrase',
           'level': 'A1',
         },
@@ -235,10 +248,11 @@ void main() {
       const entry = DictionaryEntry(
         word: 'der Apfel',
         translation: 'سیب',
+        englishTranslation: 'apple',
         partOfSpeech: 'noun',
         level: 'A1',
         example: 'Der Apfel ist rot.',
-        exampleTranslation: 'سیب قرمز است.',
+        persianExample: 'سیب قرمز است.',
         lemma: 'der Apfel',
         language: 'de',
         phonetic: 'ˈapfl̩',
@@ -267,6 +281,44 @@ void main() {
       expect(restored.imageRef, 'assets/img/apple.png');
       expect(restored.toJson()['synonyms'], ['der Apfel']);
     });
+
+    test('legacy JSON keys migrate into the 3-way model', () {
+      final entry = DictionaryEntry.fromJson({
+        'word': 'hallo',
+        'persian_translation': 'سلام',
+        'english_translation': 'hello',
+        'example': 'Hallo!',
+        'example_translation': 'سلام!',
+        'part_of_speech': 'interjection',
+        'level': 'A1',
+      });
+      expect(entry.translation, 'سلام');
+      expect(entry.englishTranslation, 'hello');
+      expect(entry.persianExample, 'سلام!');
+      expect(entry.exampleTranslation, 'سلام!');
+    });
+
+    test('translationIn/definitionIn/exampleIn honour the explanation code',
+        () {
+      const entry = DictionaryEntry(
+        word: 'water',
+        translation: 'آب',
+        englishTranslation: 'water',
+        persianDefinition: 'مایع بی رنگ و شفاف.',
+        englishDefinition: 'A clear liquid.',
+        example: 'Drink water.',
+        persianExample: 'آب بنوش.',
+        englishExample: 'Drink water.',
+        partOfSpeech: 'noun',
+        level: 'A1',
+      );
+      expect(entry.translationIn('fa'), 'آب');
+      expect(entry.translationIn('en'), 'water');
+      expect(entry.definitionIn('fa'), 'مایع بی رنگ و شفاف.');
+      expect(entry.definitionIn('en'), 'A clear liquid.');
+      expect(entry.exampleIn('fa'), 'آب بنوش.');
+      expect(entry.exampleIn('en'), 'Drink water.');
+    });
   });
 }
 
@@ -282,10 +334,20 @@ List<DictionaryEntry> _generate(int count) {
         partOfSpeech: partsOfSpeech[i % partsOfSpeech.length],
         level: levels[i % levels.length],
         example: 'Example for word $i.',
-        exampleTranslation: 'مثال برای واژه $i',
+        persianExample: 'مثال برای واژه $i',
         topics: [topics[i % topics.length]],
         tags: [i.isEven ? 'common' : 'rare'],
         frequency: count - i,
       ),
   ];
 }
+
+/// Mirrors the engine's Persian-bearing search fields (translation, glosses,
+/// definitions and example translations).
+bool _matchesPersian(DictionaryEntry entry, String q) =>
+    entry.translation.contains(q) ||
+    entry.englishTranslation.contains(q) ||
+    entry.persianDefinition.contains(q) ||
+    entry.englishDefinition.contains(q) ||
+    entry.persianExample.contains(q) ||
+    entry.englishExample.contains(q);

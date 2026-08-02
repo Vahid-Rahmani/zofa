@@ -5,6 +5,7 @@ import '../../core/state/app_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../data/models/app_user.dart';
 import '../../data/models/user_progress.dart';
+import '../settings/language_settings_screen.dart';
 import '../subscription/paywall_screen.dart';
 
 /// Profile tab: identity, stats, premium status and settings.
@@ -220,6 +221,21 @@ class _SettingsCard extends StatelessWidget {
               style: const TextStyle(fontSize: 22),
             ),
             onTap: () => _pickAvatar(context),
+          ),
+          const Divider(color: ZovaColors.surfaceRaised, height: 1),
+          ListTile(
+            leading: const Icon(Icons.language, color: ZovaColors.primary),
+            title: const Text('Language'),
+            subtitle: const Text('Interface & translations'),
+            trailing: const Icon(Icons.chevron_right,
+                color: ZovaColors.textSecondary),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const LanguageSettingsScreen(),
+                ),
+              );
+            },
           ),
           const Divider(color: ZovaColors.surfaceRaised, height: 1),
           ListTile(

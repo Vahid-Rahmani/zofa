@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'core/config/env_config.dart';
 import 'core/state/app_controller.dart';
+import 'core/state/language_controller.dart';
 import 'core/theme/zova_theme.dart';
 import 'features/auth/auth_gate.dart';
 import 'features/home/home_shell.dart';
@@ -15,10 +16,17 @@ class ZovaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final language = context.watch<LanguageController>();
     return MaterialApp(
       title: EnvConfig.appName,
       debugShowCheckedModeBanner: false,
       theme: ZovaTheme.dark,
+      locale: Locale(language.settings.uiLanguage.code),
+      builder: (context, child) => Directionality(
+        textDirection:
+            language.isRtlUi ? TextDirection.rtl : TextDirection.ltr,
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: const SessionGate(),
     );
   }

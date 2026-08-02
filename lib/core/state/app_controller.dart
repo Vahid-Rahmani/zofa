@@ -10,6 +10,7 @@ import '../../data/services/local_store.dart';
 import '../../data/services/remote_api.dart';
 import '../../data/services/spaced_repetition.dart';
 import '../../data/services/stripe_service.dart';
+import 'language_controller.dart';
 
 /// Preferences gathered during onboarding.
 class OnboardingPrefs {
@@ -34,15 +35,18 @@ class AppController extends ChangeNotifier {
     ProgressRepository? progress,
     StripeService? stripe,
     SpacedRepetitionScheduler? scheduler,
+    LanguageController? language,
   })  : _auth = auth ?? AuthRepository(),
         _progress = progress ?? ProgressRepository(),
         _stripe = stripe ?? StripeService.instance,
-        _scheduler = scheduler ?? SpacedRepetitionScheduler();
+        _scheduler = scheduler ?? SpacedRepetitionScheduler(),
+        _language = language ?? LanguageController();
 
   final AuthRepository _auth;
   final ProgressRepository _progress;
   final StripeService _stripe;
   final SpacedRepetitionScheduler _scheduler;
+  final LanguageController _language;
 
   AppUser? _user;
   UserProgress _progressData = UserProgress();
@@ -59,6 +63,10 @@ class AppController extends ChangeNotifier {
   bool get isSubscriptionActive => _progressData.subscriptionActive;
   bool get isOnboarded => _onboarded;
   OnboardingPrefs get onboardingPrefs => _prefs;
+
+  /// Language preferences (interface + translation/explanation language).
+  /// Owned here so the whole app state is reachable from [AppController].
+  LanguageController get language => _language;
 
   /// Restores the session and local progress at app launch.
   Future<void> bootstrap() async {

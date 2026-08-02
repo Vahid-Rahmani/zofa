@@ -2,6 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:zova/core/state/language_controller.dart';
+import 'package:zova/data/models/language_settings.dart';
 import 'package:zova/data/services/dictionary_service.dart';
 import 'package:zova/features/dictionary/dictionary_screen.dart';
 
@@ -17,8 +20,20 @@ void main() {
     );
   });
 
-  Future<void> pumpScreen(WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: DictionaryScreen()));
+  Future<void> pumpScreen(
+    WidgetTester tester, {
+    LanguageSettings? language,
+  }) async {
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) => LanguageController(initial: language),
+          ),
+        ],
+        child: const MaterialApp(home: DictionaryScreen()),
+      ),
+    );
     await tester.pumpAndSettle();
   }
 
@@ -33,7 +48,7 @@ void main() {
     expect(find.text('Dictionary'), findsOneWidget);
     expect(find.textContaining('420 words'), findsOneWidget);
     expect(find.text('420 results'), findsOneWidget);
-    expect(find.text('abroad'), findsOneWidget);
+    expect(find.text('abroad'), findsWidgets);
   });
 
   testWidgets('debounced search narrows the results', (tester) async {
@@ -58,5 +73,22 @@ void main() {
     await tester.tap(levelChip('All'));
     await tester.pumpAndSettle();
     expect(find.text('420 results'), findsOneWidget);
+  });
+
+  testWidgets('entry cards follow the preferred translation language',
+      (tester) async {
+    await pumpScreen(
+      tester,
+      language: const LanguageSettings(translationLanguage: AppLanguage.english),
+    );
+
+    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pump();
+
+    expect(find.text('hello'), findsWidgets,
+        reason: 'with English explanations the gloss should be English');
+    expect(find.text('سلام'), findsOneWidget,
+        reason: 'the Persian gloss is still shown as the secondary line');
   });
 }

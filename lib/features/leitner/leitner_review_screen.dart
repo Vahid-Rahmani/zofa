@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
+import '../../core/state/language_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../data/models/dictionary_entry.dart';
 
@@ -210,6 +211,8 @@ class _Flashcard extends StatelessWidget {
   }
 
   Widget _meaning(BuildContext context) {
+    final code =
+        context.watch<LanguageController>().settings.translationLanguage.code;
     return SingleChildScrollView(
       key: const ValueKey('meaning'),
       padding: const EdgeInsets.all(24),
@@ -217,8 +220,8 @@ class _Flashcard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            entry.translation,
-            textDirection: TextDirection.rtl,
+            entry.translationIn(code),
+            textDirection: code == 'fa' ? TextDirection.rtl : TextDirection.ltr,
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 26,
@@ -247,8 +250,8 @@ class _Flashcard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            entry.exampleTranslation,
-            textDirection: TextDirection.rtl,
+            entry.exampleIn(code),
+            textDirection: code == 'fa' ? TextDirection.rtl : TextDirection.ltr,
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 14,
