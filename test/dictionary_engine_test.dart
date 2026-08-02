@@ -60,18 +60,22 @@ void main() {
       expect(result.items.every((e) => e.word.startsWith('wa')), isTrue);
     });
 
-    test('Persian queries scan translations, definitions and examples', () {
+    test('queries scan headwords and example sentences', () {
       final result =
-          dict.searchPaged(const DictionaryQuery(query: 'آب', limit: 20));
+          dict.searchPaged(const DictionaryQuery(query: 'how are you', limit: 20));
       expect(result.total, greaterThanOrEqualTo(1));
-      expect(result.items.any((e) => e.word == 'water'), isTrue);
-      final translationOnly =
-          dict.entries.where((e) => e.translation.contains('آب')).length;
-      expect(result.total, greaterThanOrEqualTo(translationOnly),
-          reason: 'search must still surface every translation match');
+      expect(result.items.any((e) => e.word == 'hello'), isTrue);
+      final exampleOnly =
+          dict.entries.where((e) => e.example.contains('how are you')).length;
+      expect(result.total, greaterThanOrEqualTo(exampleOnly),
+          reason: 'search must still surface every example match');
       for (final e in result.items) {
-        expect(_matchesPersian(e, 'آب'), isTrue,
-            reason: '"${e.word}" should match آب in some field');
+        expect(
+          e.word.toLowerCase().contains('how are you') ||
+              e.example.toLowerCase().contains('how are you'),
+          isTrue,
+          reason: '"${e.word}" should match the query in some field',
+        );
       }
     });
 
@@ -134,7 +138,7 @@ void main() {
 
       final hit = service.lookup('word050000');
       expect(hit, isNotNull);
-      expect(hit!.translation, 'معنی 50000');
+      expect(hit!.example, 'Example for word 50000.');
       expect(service.lookup('nothere'), isNull);
 
       final prefix = service.searchPaged(
@@ -143,11 +147,11 @@ void main() {
       expect(prefix.items.length, 20);
       expect(prefix.items.every((e) => e.word.startsWith('word01')), isTrue);
 
-      final persian = service.searchPaged(
-        const DictionaryQuery(query: 'معنی', limit: 50),
+      final byExample = service.searchPaged(
+        const DictionaryQuery(query: 'Example for word', limit: 50),
       );
-      expect(persian.total, greaterThan(0));
-      expect(persian.items.length, 50);
+      expect(byExample.total, greaterThan(0));
+      expect(byExample.items.length, 50);
 
       final filtered = service.searchPaged(
         const DictionaryQuery(
@@ -173,13 +177,18 @@ void main() {
   group('validation and resilience', () {
     test('validate reports each missing required field', () {
       final errors = DictionaryEntry.validate({
-        'translation': 'سلام',
-        'example': 'Hi.',
+        'word': 'water',
+        'part_of_speech': 'noun',
+        'level': 'A1',
+        'example': 'Drink water.',
       });
-      expect(errors, contains('missing or empty "word"'));
-      expect(errors, contains('missing or empty "part_of_speech"'));
-      expect(errors, contains('missing or empty "level"'));
-      expect(errors, isNot(contains('missing or empty "translation"')));
+      expect(errors, isEmpty);
+
+      final missing = DictionaryEntry.validate({'example': 'Hi.'});
+      expect(missing, contains('missing or empty "word"'));
+      expect(missing, contains('missing or empty "part_of_speech"'));
+      expect(missing, contains('missing or empty "level"'));
+      expect(missing, isNot(contains('missing or empty "example"')));
     });
 
     test('tryParse returns null for malformed rows and parses valid ones', () {
@@ -187,10 +196,9 @@ void main() {
       expect(
         DictionaryEntry.tryParse({
           'word': 'hi',
-          'translation': 'سلام',
-          'english_translation': 'hi',
           'part_of_speech': 'interjection',
           'level': 'A1',
+          'example': 'Hi!',
         }),
         isNotNull,
       );
@@ -200,19 +208,17 @@ void main() {
       final service = DictionaryService.fromJsonString(jsonEncode([
         {
           'word': 'good',
-          'translation': 'خوب',
-          'english_translation': 'good',
           'part_of_speech': 'adjective',
           'level': 'A1',
+          'example': 'Have a good day!',
         },
         {'word': 'broken'},
         'not-a-map',
         {
           'word': 'night',
-          'translation': 'شب',
-          'english_translation': 'night',
           'part_of_speech': 'noun',
           'level': 'A1',
+          'example': 'Good night!',
         },
       ]));
       expect(service.wordCount, 2);
@@ -226,17 +232,15 @@ void main() {
         {
           'id': 'custom-id',
           'word': 'hello',
-          'translation': 'سلام',
-          'english_translation': 'hello',
           'part_of_speech': 'interjection',
           'level': 'A1',
+          'example': 'Hello!',
         },
         {
           'word': 'Good morning',
-          'translation': 'صبح بخیر',
-          'english_translation': 'good morning',
           'part_of_speech': 'phrase',
           'level': 'A1',
+          'example': 'Good morning, everyone!',
         },
       ]));
       expect(service.byId('custom-id')!.word, 'hello');
@@ -247,12 +251,9 @@ void main() {
     test('new metadata fields round-trip through JSON', () {
       const entry = DictionaryEntry(
         word: 'der Apfel',
-        translation: 'سیب',
-        englishTranslation: 'apple',
         partOfSpeech: 'noun',
         level: 'A1',
         example: 'Der Apfel ist rot.',
-        persianExample: 'سیب قرمز است.',
         lemma: 'der Apfel',
         language: 'de',
         phonetic: 'ˈapfl̩',
@@ -262,7 +263,6 @@ void main() {
         antonyms: [],
         relatedWords: ['der Apfelbaum'],
         irregularForms: [],
-        alternateTranslations: ['انگلیسی: apple'],
         topics: ['food'],
         tags: ['fruit'],
         frequency: 900,
@@ -276,48 +276,25 @@ void main() {
       expect(restored.plural, 'die Äpfel');
       expect(restored.synonyms, ['der Apfel']);
       expect(restored.relatedWords, ['der Apfelbaum']);
-      expect(restored.alternateTranslations, ['انگلیسی: apple']);
       expect(restored.audioRef, 'assets/audio/appfel.mp3');
       expect(restored.imageRef, 'assets/img/apple.png');
       expect(restored.toJson()['synonyms'], ['der Apfel']);
     });
 
-    test('legacy JSON keys migrate into the 3-way model', () {
+    test('legacy gloss keys in JSON are ignored by the slim model', () {
       final entry = DictionaryEntry.fromJson({
         'word': 'hallo',
-        'persian_translation': 'سلام',
-        'english_translation': 'hello',
-        'example': 'Hallo!',
-        'example_translation': 'سلام!',
         'part_of_speech': 'interjection',
         'level': 'A1',
+        'example': 'Hallo!',
+        'translation': 'سلام',
+        'english_translation': 'hello',
+        'persian_example': 'سلام!',
       });
-      expect(entry.translation, 'سلام');
-      expect(entry.englishTranslation, 'hello');
-      expect(entry.persianExample, 'سلام!');
-      expect(entry.exampleTranslation, 'سلام!');
-    });
-
-    test('translationIn/definitionIn/exampleIn honour the explanation code',
-        () {
-      const entry = DictionaryEntry(
-        word: 'water',
-        translation: 'آب',
-        englishTranslation: 'water',
-        persianDefinition: 'مایع بی رنگ و شفاف.',
-        englishDefinition: 'A clear liquid.',
-        example: 'Drink water.',
-        persianExample: 'آب بنوش.',
-        englishExample: 'Drink water.',
-        partOfSpeech: 'noun',
-        level: 'A1',
-      );
-      expect(entry.translationIn('fa'), 'آب');
-      expect(entry.translationIn('en'), 'water');
-      expect(entry.definitionIn('fa'), 'مایع بی رنگ و شفاف.');
-      expect(entry.definitionIn('en'), 'A clear liquid.');
-      expect(entry.exampleIn('fa'), 'آب بنوش.');
-      expect(entry.exampleIn('en'), 'Drink water.');
+      expect(entry.word, 'hallo');
+      expect(entry.example, 'Hallo!');
+      expect(entry.toJson().containsKey('translation'), isFalse);
+      expect(entry.toJson().containsKey('persian_example'), isFalse);
     });
   });
 }
@@ -330,24 +307,12 @@ List<DictionaryEntry> _generate(int count) {
     for (var i = 0; i < count; i++)
       DictionaryEntry(
         word: 'word${i.toString().padLeft(6, '0')}',
-        translation: 'معنی $i',
         partOfSpeech: partsOfSpeech[i % partsOfSpeech.length],
         level: levels[i % levels.length],
         example: 'Example for word $i.',
-        persianExample: 'مثال برای واژه $i',
         topics: [topics[i % topics.length]],
         tags: [i.isEven ? 'common' : 'rare'],
         frequency: count - i,
       ),
   ];
 }
-
-/// Mirrors the engine's Persian-bearing search fields (translation, glosses,
-/// definitions and example translations).
-bool _matchesPersian(DictionaryEntry entry, String q) =>
-    entry.translation.contains(q) ||
-    entry.englishTranslation.contains(q) ||
-    entry.persianDefinition.contains(q) ||
-    entry.englishDefinition.contains(q) ||
-    entry.persianExample.contains(q) ||
-    entry.englishExample.contains(q);

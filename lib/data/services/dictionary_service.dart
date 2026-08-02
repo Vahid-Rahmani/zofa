@@ -162,9 +162,6 @@ class DictionaryService {
   /// Whether an entry for [concept] exists in this dictionary.
   bool hasConcept(String concept) => _byConcept.containsKey(concept);
 
-  /// Convenience: the translation of [word], when known.
-  String? translation(String word) => lookup(word)?.translation;
-
   /// Filters entries by CEFR [level] (`A1`, `A2`, ...).
   List<DictionaryEntry> byLevel(String level) => List.unmodifiable(
       [for (final p in _index.positionsForLevel(level)) _entries[p]]);
@@ -182,10 +179,10 @@ class DictionaryService {
   List<DictionaryEntry> byTag(String tag) => List.unmodifiable(
       [for (final p in _index.positionsForTag(tag)) _entries[p]]);
 
-  /// Fuzzy search across headwords, translations (Persian and English),
-  /// definitions and examples. Works for Latin and Persian queries alike.
-  /// Linear scan kept for compatibility with small datasets; use
-  /// [searchPaged] for paginated, indexed queries.
+  /// Fuzzy search across headwords, example sentences and the other
+  /// target-language facts (synonyms, related words, topics). Linear scan kept
+  /// for compatibility with small datasets; use [searchPaged] for paginated,
+  /// indexed queries.
   List<DictionaryEntry> search(String query) {
     final q = normalizeText(query);
     if (q.isEmpty) return all;
@@ -195,11 +192,12 @@ class DictionaryService {
   /// Paginated, filtered search for the Dictionary UI.
   ///
   /// Latin headword queries are narrowed to the index's prefix table
-  /// (O(log n + k)); Persian queries fall back to a full scan over
-  /// translations and examples. Filters (level, part of speech, tags) are
-  /// applied on the narrowed candidates, then [DictionaryQuery.offset] /
-  /// [DictionaryQuery.limit] page the results. The result reports the total
-  /// match count so the UI can drive infinite scrolling.
+  /// (O(log n + k)); other queries fall back to a full scan over example
+  /// sentences and the remaining target-language facts. Filters (level, part
+  /// of speech, tags) are applied on the narrowed candidates, then
+  /// [DictionaryQuery.offset] / [DictionaryQuery.limit] page the results. The
+  /// result reports the total match count so the UI can drive infinite
+  /// scrolling.
   DictionarySearchResult searchPaged(DictionaryQuery query) {
     final q = normalizeText(query.query);
     final headwordQuery = q.isNotEmpty && isHeadwordQuery(q);
@@ -250,13 +248,14 @@ class DictionaryService {
 
   bool _matchesText(DictionaryEntry entry, String q) =>
       normalizeText(entry.word).contains(q) ||
-      normalizeText(entry.translation).contains(q) ||
-      normalizeText(entry.englishTranslation).contains(q) ||
-      normalizeText(entry.persianDefinition).contains(q) ||
-      normalizeText(entry.englishDefinition).contains(q) ||
       normalizeText(entry.example).contains(q) ||
-      normalizeText(entry.persianExample).contains(q) ||
-      normalizeText(entry.englishExample).contains(q);
+      normalizeText(entry.effectiveLemma).contains(q) ||
+      normalizeText(entry.plural ?? '').contains(q) ||
+      entry.synonyms.any((s) => normalizeText(s).contains(q)) ||
+      entry.antonyms.any((a) => normalizeText(a).contains(q)) ||
+      entry.relatedWords.any((r) => normalizeText(r).contains(q)) ||
+      entry.topics.any((t) => normalizeText(t).contains(q)) ||
+      entry.tags.any((t) => normalizeText(t).contains(q));
 }
 
 /// Inputs for the background-isolate pack parse.

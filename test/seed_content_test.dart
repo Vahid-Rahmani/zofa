@@ -43,6 +43,10 @@ void main() {
             expect(exercise.correctAnswer, isNotNull);
           case ExerciseType.pairs:
             expect(exercise.pairs.length, greaterThanOrEqualTo(2));
+            for (final pair in exercise.pairs.entries) {
+              expect(pair.value, isNotEmpty,
+                  reason: '${pair.key} should pair with a non-empty example');
+            }
           case ExerciseType.flashcard:
             expect(exercise.words, isNotEmpty);
             expect(exercise.pairs.keys.toSet(), containsAll(exercise.words));
@@ -51,11 +55,15 @@ void main() {
               expect(exercise.examples[word], isNotEmpty,
                   reason: '$word should have an example sentence');
             }
+          case ExerciseType.article:
+            expect(exercise.correctAnswer, isNotNull);
+            expect(exercise.options, contains(exercise.correctAnswer));
+            expect(exercise.options.toSet(), containsAll(['der', 'die', 'das']));
         }
       }
     });
 
-    test('course vocabulary covers hundreds of distinct words', () {
+    test('every course word exists in the master dataset', () {
       final words = <String>{};
       for (final level in course.levels) {
         for (final lesson in level.lessons) {

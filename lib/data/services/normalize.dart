@@ -34,9 +34,11 @@ int headwordHash(String text) {
   return hash;
 }
 
-/// True when [query] looks like a headword (Latin letters, digits, spaces) and
-/// therefore can be served by the index's prefix table. Persian (and other
-/// non-Latin) queries fall back to a full scan over translations and examples.
+/// True when [query] is a single Latin token and therefore can be served by
+/// the index's headword-prefix table. Multi-word phrases (even "headword-
+/// shaped" ones like `ice cream`) and Persian (or other non-Latin) queries
+/// fall back to a full scan over example sentences and the remaining
+/// target-language facts, so phrases always find their matches.
 bool isHeadwordQuery(String query) =>
-    RegExp(r'^[\p{L}\p{N} ]+$', unicode: true).hasMatch(query) &&
+    RegExp(r'^[\p{L}\p{N}]+$', unicode: true).hasMatch(query) &&
     !RegExp(r'[\u0600-\u06FF]').hasMatch(query);

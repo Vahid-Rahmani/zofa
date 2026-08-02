@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/state/app_controller.dart';
 import '../../../core/theme/zova_colors.dart';
 import '../../../data/models/exercise.dart';
+import 'exercises/article_view.dart';
 import 'exercises/choose_answer_view.dart';
 import 'exercises/flashcard_view.dart';
 import 'exercises/pairs_view.dart';
@@ -168,6 +169,11 @@ class _LessonScreenState extends State<LessonScreen> {
                           _handleResult(correct: correct),
                     ),
                   ExerciseType.pairs => PairsView(
+                      exercise: exercise,
+                      onDone: (correct) =>
+                          _handleResult(correct: correct),
+                    ),
+                  ExerciseType.article => ArticleView(
                       exercise: exercise,
                       onDone: (correct) =>
                           _handleResult(correct: correct),

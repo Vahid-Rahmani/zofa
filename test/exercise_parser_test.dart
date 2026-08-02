@@ -26,8 +26,14 @@ void main() {
           type: ExerciseType.flashcard,
           prompt: 'Learn these words',
           words: ['hello', 'goodbye'],
-          pairs: {'hello': 'hallo', 'goodbye': 'auf Wiedersehen'},
-          examples: {'hello': 'Hello, how are you?', 'goodbye': 'Goodbye!'},
+          pairs: {'hello': 'Hello!', 'goodbye': 'Goodbye!'},
+          examples: {'hello': 'Hello!', 'goodbye': 'Goodbye!'},
+        ),
+        const Exercise(
+          type: ExerciseType.article,
+          prompt: '«Wasser» — Which article does it take?',
+          options: ['der', 'die', 'das'],
+          correctAnswer: 'das',
         ),
       ];
 

@@ -10,9 +10,11 @@ import 'dictionary_service.dart';
 /// Bundled educational content for zova.
 ///
 /// Everything here is written from scratch in the B-Amooz style: courses and
-/// lessons are generated from the bundled [DictionaryData] so vocabulary,
-/// translations, examples and proficiency levels (A1/A2/B1) stay in one place,
-/// and every book ships with a Persian translation for bilingual reading.
+/// lessons are generated from the bundled master datasets so vocabulary,
+/// examples and proficiency levels (A1/A2/B1) stay in one place, and every
+/// exercise is translation-free (built from words + example sentences), which
+/// makes lessons work offline and for any native language. Each book ships
+/// with a curated Persian translation for bilingual reading.
 ///
 /// All models are JSON-serialisable, so this content can later move to the
 /// backend and be fetched per course without touching the UI.
@@ -371,12 +373,16 @@ abstract final class SeedContent {
     }
     final selected = words1.take(target).toList();
 
+    // Exercises are built purely from master facts (words + example
+    // sentences), so they work offline and are independent of the learner's
+    // native language. The article quiz only appears for gendered nouns
+    // (German); every other exercise is language-agnostic.
     final exercises = <Exercise>[
       Exercise(
         type: ExerciseType.flashcard,
         prompt: 'Learn these words',
         words: [for (final w in selected) w.word],
-        pairs: {for (final w in selected) w.word: w.translation},
+        pairs: {for (final w in selected) w.word: w.example},
         examples: {for (final w in selected) w.word: w.example},
       ),
     ];
@@ -385,13 +391,13 @@ abstract final class SeedContent {
       exercises.add(
         Exercise(
           type: ExerciseType.chooseAnswer,
-          prompt: 'What does "${w.word}" mean?',
+          prompt: '«${w.example}» — Which word fits this sentence?',
           options: _distractors(
-            correct: w.translation,
-            pool: _translationsOf(dict, level),
+            correct: w.word,
+            pool: _wordsOf(dict, level),
             seed: w.word.length + selected.indexOf(w) * 7 + lessonId.length,
           ),
-          correctAnswer: w.translation,
+          correctAnswer: w.word,
         ),
       );
     }
@@ -399,32 +405,33 @@ abstract final class SeedContent {
     exercises.add(
       Exercise(
         type: ExerciseType.pairs,
-        prompt: 'Match the pairs',
-        pairs: {for (final w in selected.take(4)) w.word: w.translation},
+        prompt: 'Match each word to its example',
+        pairs: {for (final w in selected.take(4)) w.word: w.example},
       ),
     );
 
     for (final w in selected.skip(4).take(2)) {
       exercises.add(
         Exercise(
-          type: ExerciseType.translate,
-          prompt: 'Translate "${w.word}"',
-          correctAnswer: w.translation,
+          type: ExerciseType.chooseAnswer,
+          prompt: '«${w.word}» — Which sentence uses it?',
+          options: _distractors(
+            correct: w.example,
+            pool: _examplesOf(dict, level),
+            seed: w.example.length * 3 + lessonId.length + 11,
+          ),
+          correctAnswer: w.example,
         ),
       );
     }
 
-    for (final w in selected.skip(6).take(2)) {
+    for (final w in selected.where((e) => e.gender != null).take(2)) {
       exercises.add(
         Exercise(
-          type: ExerciseType.chooseAnswer,
-          prompt: '«${w.translation}» یعنی چه؟',
-          options: _distractors(
-            correct: w.word,
-            pool: _wordsOf(dict, level),
-            seed: w.translation.length * 3 + lessonId.length + 11,
-          ),
-          correctAnswer: w.word,
+          type: ExerciseType.article,
+          prompt: '«${w.word}» — Which article does it take?',
+          options: const ['der', 'die', 'das'],
+          correctAnswer: w.gender,
         ),
       );
     }
@@ -432,8 +439,11 @@ abstract final class SeedContent {
     return exercises;
   }
 
-  static List<String> _translationsOf(DictionaryService dict, String level) =>
-      dict.entries.where((e) => e.level == level).map((e) => e.translation).toList();
+  static List<String> _examplesOf(DictionaryService dict, String level) =>
+      dict.entries
+          .where((e) => e.level == level)
+          .map((e) => e.example)
+          .toList();
 
   static List<String> _wordsOf(DictionaryService dict, String level) =>
       dict.entries.where((e) => e.level == level).map((e) => e.word).toList();

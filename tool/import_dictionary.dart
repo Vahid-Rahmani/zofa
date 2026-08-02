@@ -17,17 +17,19 @@ Commands:
       its index sidecar.
   dart run tool/import_dictionary.dart build-index <entries.json> --index <index.json>
       Rebuild only the index sidecar for existing canonical entries JSON.
+  dart run tool/import_dictionary.dart strip <entries.json> [--output <entries.json>] [--index <index.json>]
+      Rewrite canonical entries JSON dropping any legacy gloss/translation keys
+      (the master dataset is slim and translation-free). Rebuilds the index
+      sidecar when --index is given.
   dart run tool/import_dictionary.dart stats <entries.json>
       Print level / part-of-speech / tag statistics for canonical entries JSON.
 
 Dump format (JSON array or newline-delimited JSON objects):
   {
     "word": "hello",                  // required
-    "translation": "سلام",            // required
+    "example": "Hello!",              // required
     "part_of_speech": "interjection", // required
     "level": "A1",                    // required, A1..C2
-    "example": "Hello!",              // optional
-    "example_translation": "سلام!",   // optional
     "id": "hello",                    // optional; slugs to the word when absent
     "lemma": "hello",                 // optional base form
     "language": "en",                 // optional ISO 639-1
@@ -38,7 +40,6 @@ Dump format (JSON array or newline-delimited JSON objects):
     "antonyms": [],                   // optional
     "related_words": [],              // optional
     "irregular_forms": [],            // optional
-    "alternate_translations": [],     // optional
     "topics": ["greetings"],          // optional
     "tags": ["informal"],             // optional
     "frequency": 1200,                // optional
@@ -59,6 +60,8 @@ void main(List<String> args) {
       _runImport(args.sublist(1));
     case 'build-index':
       _runBuildIndex(args.sublist(1));
+    case 'strip':
+      _runStrip(args.sublist(1));
     case 'stats':
       _runStats(args.sublist(1));
     default:
@@ -105,6 +108,26 @@ void _runBuildIndex(List<String> args) {
   final entries = _readCanonical(input);
   _writeIndex(entries, index);
   _printStats(entries);
+}
+
+/// Rewrites canonical entries JSON through [DictionaryEntry.toJson], which
+/// emits only the slim master-dataset fields, dropping legacy gloss keys.
+void _runStrip(List<String> args) {
+  final parsed = _parseArgs(args);
+  final input = parsed.positional.isNotEmpty ? parsed.positional.first : '';
+  final output = parsed.flags['output'] ?? input;
+  final index = parsed.flags['index'];
+  if (input.isEmpty || output.isEmpty) {
+    stdout.writeln('strip requires <entries.json> [--output <entries.json>]');
+    exit(2);
+  }
+
+  final entries = _readCanonical(input);
+  final file = File(output);
+  file.createSync(recursive: true);
+  file.writeAsStringSync('${jsonEncode([for (final e in entries) e.toJson()])}\n');
+  stdout.writeln('stripped: $input -> $output (${entries.length} entries)');
+  if (index != null) _writeIndex(entries, index);
 }
 
 void _runStats(List<String> args) {
@@ -166,11 +189,6 @@ List<DictionaryEntry> _buildEntries(List<Map<String, dynamic>> raw) {
       _warn('row $i: duplicate word "$word" — skipped');
       continue;
     }
-    final translation = row['translation'] as String? ?? '';
-    if (translation.trim().isEmpty) {
-      _warn('row $i: "$word" missing translation — skipped');
-      continue;
-    }
     final pos = row['part_of_speech'] as String? ?? '';
     if (pos.trim().isEmpty) {
       _warn('row $i: "$word" missing part_of_speech — skipped');
@@ -181,20 +199,17 @@ List<DictionaryEntry> _buildEntries(List<Map<String, dynamic>> raw) {
       _warn('row $i: "$word" invalid level "${row['level']}" — skipped');
       continue;
     }
+    final example = row['example'] as String? ?? '';
+    if (example.trim().isEmpty) {
+      _warn('row $i: "$word" missing example — skipped');
+      continue;
+    }
     entries.add(DictionaryEntry(
       word: word,
-      translation: translation,
-      englishTranslation: row['english_translation'] as String? ?? '',
-      persianDefinition: row['persian_definition'] as String? ?? '',
-      englishDefinition: row['english_definition'] as String? ?? '',
-      persianExample: row['example_translation'] as String? ??
-          row['persian_example'] as String? ??
-          '',
-      englishExample: row['english_example'] as String? ?? '',
-      concept: row['concept'] as String?,
       partOfSpeech: pos,
       level: level,
-      example: row['example'] as String? ?? '',
+      example: example,
+      concept: row['concept'] as String?,
       id: row['id'] as String?,
       lemma: row['lemma'] as String?,
       language: row['language'] as String?,
@@ -205,7 +220,6 @@ List<DictionaryEntry> _buildEntries(List<Map<String, dynamic>> raw) {
       antonyms: _listOf(row, 'antonyms'),
       relatedWords: _listOf(row, 'related_words'),
       irregularForms: _listOf(row, 'irregular_forms'),
-      alternateTranslations: _listOf(row, 'alternate_translations'),
       topics: _listOf(row, 'topics'),
       tags: _listOf(row, 'tags'),
       frequency: (row['frequency'] as num?)?.toInt(),

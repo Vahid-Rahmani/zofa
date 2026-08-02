@@ -27,15 +27,11 @@ void main() {
     test('every entry is complete and level-tagged', () {
       for (final entry in dict.all) {
         expect(entry.word, isNotEmpty);
-        expect(entry.translation, isNotEmpty,
-            reason: '${entry.word} should have a Persian translation');
         expect(['A1', 'A2', 'B1'], contains(entry.level),
             reason: '${entry.word} should carry a valid level');
         expect(entry.partOfSpeech, isNotEmpty);
         expect(entry.example, isNotEmpty,
             reason: '${entry.word} should have a German example');
-        expect(entry.exampleTranslation, isNotEmpty,
-            reason: '${entry.word} example should have a Persian translation');
       }
     });
 
@@ -59,18 +55,12 @@ void main() {
     test('lookup is case-insensitive and ignores punctuation', () {
       final hallo = dict.lookup('hallo');
       expect(hallo, isNotNull);
-      expect(hallo!.translation, 'سلام');
+      expect(hallo!.example, isNotEmpty);
 
       expect(dict.lookup('HALLO'), isNotNull);
       expect(dict.lookup('Hallo,'), isNotNull);
       expect(dict.lookup('danke'), isNotNull);
       expect(dict.lookup('diesistkeinwort'), isNull);
-    });
-
-    test('translation() returns Persian or null', () {
-      expect(dict.translation('Wasser'), 'آب');
-      expect(dict.translation('wasser'), 'آب');
-      expect(dict.translation('xyzzy'), isNull);
     });
 
     test('byLevel filters entries', () {
@@ -79,25 +69,20 @@ void main() {
       expect(b1.every((e) => e.level == 'B1'), isTrue);
     });
 
-    test('search matches German words and Persian translations', () {
+    test('search matches headwords and German example sentences', () {
       expect(dict.search('Wasser'), isNotEmpty);
-      final byPersian = dict.search('آب');
-      expect(byPersian, isNotEmpty);
-      expect(byPersian.any((e) => e.word == 'Wasser'), isTrue);
-      expect(
-        byPersian.any((e) => e.translation.contains('آب')),
-        isTrue,
-        reason: 'translation matches must still surface',
-      );
-      expect(byPersian.length, lessThan(dict.wordCount),
-          reason: 'a Persian query should filter, not return everything');
+      final byExample = dict.search('Trink mehr');
+      expect(byExample, isNotEmpty);
+      expect(byExample.any((e) => e.word == 'Wasser'), isTrue,
+          reason: 'the Wasser entry must surface via its example sentence');
+      expect(byExample.length, lessThan(dict.wordCount),
+          reason: 'an example query should filter, not return everything');
       expect(dict.search(''), dict.all);
     });
 
-    test('German examples come with Persian translations', () {
+    test('entries carry a German example sentence', () {
       final entry = dict.lookup('Wasser')!;
       expect(entry.example, 'Trink mehr Wasser jeden Tag.');
-      expect(entry.exampleTranslation, isNotEmpty);
     });
   });
 }
