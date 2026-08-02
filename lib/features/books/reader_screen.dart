@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/state/app_controller.dart';
 import '../../core/state/language_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/utils/clean_text.dart';
 import '../../data/models/book.dart';
 import '../../data/models/translation_result.dart';
 import '../../data/services/translation_service.dart';
@@ -254,6 +255,13 @@ class _WordLookupSheetState extends State<_WordLookupSheet> {
   Widget _resultContent(BuildContext context) {
     final result = _result!;
     final rtl = result.isRtl;
+    final word = cleanText(result.word);
+    final translation = cleanText(result.translation);
+    final definition = cleanText(result.definition ?? '');
+    final example = cleanText(result.example ?? '');
+    final exampleTranslation = cleanText(result.exampleTranslation ?? '');
+    final glossLine =
+        result.glossLine == null ? null : cleanText(result.glossLine!);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,7 +270,7 @@ class _WordLookupSheetState extends State<_WordLookupSheet> {
           children: [
             Expanded(
               child: Text(
-                result.word,
+                word,
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w800,
@@ -270,9 +278,9 @@ class _WordLookupSheetState extends State<_WordLookupSheet> {
                 ),
               ),
             ),
-            if (result.glossLine != null)
+            if (glossLine != null)
               Text(
-                result.glossLine!,
+                glossLine,
                 style: const TextStyle(
                   fontSize: 13,
                   fontStyle: FontStyle.italic,
@@ -283,7 +291,7 @@ class _WordLookupSheetState extends State<_WordLookupSheet> {
         ),
         const SizedBox(height: 8),
         Text(
-          result.translation,
+          translation,
           textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
           style: const TextStyle(
             fontSize: 18,
@@ -291,10 +299,10 @@ class _WordLookupSheetState extends State<_WordLookupSheet> {
             color: ZovaColors.primary,
           ),
         ),
-        if (result.definition != null && result.definition!.isNotEmpty) ...[
+        if (definition.isNotEmpty) ...[
           const SizedBox(height: 10),
           Text(
-            result.definition!,
+            definition,
             textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
             style: const TextStyle(
               fontSize: 14,
@@ -303,7 +311,7 @@ class _WordLookupSheetState extends State<_WordLookupSheet> {
             ),
           ),
         ],
-        if (result.example != null) ...[
+        if (example.isNotEmpty) ...[
           const SizedBox(height: 12),
           Container(
             width: double.infinity,
@@ -316,17 +324,17 @@ class _WordLookupSheetState extends State<_WordLookupSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '“${result.example}”',
+                  '“$example”',
                   style: const TextStyle(
                     fontSize: 14,
                     height: 1.5,
                     color: ZovaColors.textPrimary,
                   ),
                 ),
-                if (result.exampleTranslation != null) ...[
+                if (exampleTranslation.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
-                    result.exampleTranslation!,
+                    exampleTranslation,
                     textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
                     style: const TextStyle(
                       fontSize: 13,
@@ -366,58 +374,97 @@ class _ParagraphPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+      padding: const EdgeInsets.fromLTRB(24, 28, 24, 48),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: ZovaColors.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              'CHAPTER',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 2.4,
+                color: ZovaColors.secondary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           Text(
             chapter.title,
             style: const TextStyle(
-              fontSize: 26,
+              fontSize: 30,
               fontWeight: FontWeight.w800,
+              height: 1.15,
               color: ZovaColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
+          Container(
+            width: 56,
+            height: 3,
+            decoration: BoxDecoration(
+              color: ZovaColors.primary,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 26),
           if (showPersian)
             for (final paragraph in chapter.paragraphs)
-              if (paragraph.translation != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 18),
-                  child: Text(
-                    paragraph.translation!,
-                    textDirection: TextDirection.rtl,
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      height: 1.8,
-                      color: ZovaColors.textPrimary,
-                    ),
-                  ),
-                )
-              else
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 18),
-                  child: Text(
-                    paragraph.text,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      height: 1.6,
-                      color: ZovaColors.textPrimary,
-                    ),
-                  ),
-                )
+              _ParagraphBlock(
+                text: paragraph.translation ?? paragraph.text,
+                rtl: paragraph.translation != null,
+                onWordTap: onWordTap,
+              )
           else
             for (final paragraph in chapter.paragraphs)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 18),
-                child: _TappableParagraph(
-                  text: paragraph.text,
-                  onWordTap: onWordTap,
-                ),
+              _ParagraphBlock(
+                text: paragraph.text,
+                rtl: false,
+                onWordTap: onWordTap,
               ),
         ],
       ),
+    );
+  }
+}
+
+class _ParagraphBlock extends StatelessWidget {
+  const _ParagraphBlock({
+    required this.text,
+    required this.rtl,
+    required this.onWordTap,
+  });
+
+  final String text;
+  final bool rtl;
+  final ValueChanged<String> onWordTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (rtl) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 22),
+        child: Text(
+          text,
+          textDirection: TextDirection.rtl,
+          textAlign: TextAlign.right,
+          style: const TextStyle(
+            fontSize: 18,
+            height: 2.0,
+            color: ZovaColors.textPrimary,
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 22),
+      child: _TappableParagraph(text: text, onWordTap: onWordTap),
     );
   }
 }
@@ -441,8 +488,8 @@ class _TappableParagraph extends StatelessWidget {
             return TextSpan(
               text: token.word,
               style: const TextStyle(
-                fontSize: 18,
-                height: 1.6,
+                fontSize: 19,
+                height: 1.7,
                 color: ZovaColors.textPrimary,
               ),
             );
@@ -453,8 +500,8 @@ class _TappableParagraph extends StatelessWidget {
               child: Text(
                 token.word,
                 style: TextStyle(
-                  fontSize: 18,
-                  height: 1.6,
+                  fontSize: 19,
+                  height: 1.7,
                   color: ZovaColors.secondary,
                   fontWeight: FontWeight.w600,
                   decoration: TextDecoration.underline,

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../core/config/env_config.dart';
+import '../../core/utils/clean_text.dart';
 import '../models/translation_result.dart';
 
 /// A single lookup request against a translation provider.
@@ -191,10 +192,11 @@ class OnlineTranslationBackend implements TranslationBackend {
     if (decoded is! Map<String, dynamic>) return null;
 
     final sentences = decoded['sentences'] as List<dynamic>? ?? const [];
-    final translation = sentences
-        .map((s) => (s as Map<String, dynamic>)['trans'] as String? ?? '')
-        .join()
-        .trim();
+    final translation = cleanText(
+      sentences
+          .map((s) => (s as Map<String, dynamic>)['trans'] as String? ?? '')
+          .join(),
+    );
     if (translation.isEmpty) return null;
 
     final dict = decoded['dict'] as List<dynamic>? ?? const [];
@@ -202,10 +204,15 @@ class OnlineTranslationBackend implements TranslationBackend {
     final terms = <String>[];
     for (final raw in dict) {
       final entry = raw as Map<String, dynamic>;
-      partOfSpeech ??= entry['pos'] as String?;
+      final pos = entry['pos'] as String?;
+      if (pos != null && pos.trim().isNotEmpty) {
+        partOfSpeech ??= cleanText(pos);
+      }
       for (final term in entry['terms'] as List<dynamic>? ?? const []) {
-        if (term is String && term.trim().isNotEmpty && term.trim() != translation) {
-          terms.add(term.trim());
+        if (term is! String) continue;
+        final cleaned = cleanText(term);
+        if (cleaned.isNotEmpty && cleaned != translation) {
+          terms.add(cleaned);
         }
       }
     }
@@ -229,7 +236,7 @@ class OnlineTranslationBackend implements TranslationBackend {
     final match = RegExp(
       r'^\s*(der|die|das)\b',
       caseSensitive: false,
-    ).firstMatch(extract);
+    ).firstMatch(cleanText(extract));
     return match?.group(1)?.toLowerCase();
   }
 
@@ -244,14 +251,14 @@ class OnlineTranslationBackend implements TranslationBackend {
       final block = raw as Map<String, dynamic>;
       for (final rawDef in block['definitions'] as List<dynamic>? ?? const []) {
         final def = rawDef as Map<String, dynamic>;
-        final definition = (def['definition'] as String? ?? '').trim();
+        final definition = cleanText(def['definition'] as String? ?? '');
         if (definition.isEmpty) continue;
         String? example;
         for (final rawExample
             in def['parsedExamples'] as List<dynamic>? ?? const []) {
-          final text =
-              ((rawExample as Map<String, dynamic>)['example'] as String? ?? '')
-                  .trim();
+          final text = cleanText(
+            (rawExample as Map<String, dynamic>)['example'] as String? ?? '',
+          );
           if (text.isNotEmpty) {
             example = text;
             break;
@@ -299,25 +306,32 @@ class ConfiguredEndpointBackend implements TranslationBackend {
           .timeout(timeout);
       if (response.statusCode != 200) return null;
       final json = jsonDecode(response.body) as Map<String, dynamic>;
-      final translation = (json['translation'] as String? ?? '').trim();
+      final translation = cleanText(json['translation'] as String? ?? '');
       if (translation.isEmpty) return null;
       return TranslationResult(
         word: request.word,
         source: request.source,
         target: request.target,
         translation: translation,
-        partOfSpeech: json['part_of_speech'] as String?,
-        gender: json['gender'] as String?,
-        definition: json['definition'] as String?,
-        example: json['example'] as String?,
-        exampleTranslation: json['example_translation'] as String?,
+        partOfSpeech: _cleanNullable(json['part_of_speech'] as String?),
+        gender: _cleanNullable(json['gender'] as String?),
+        definition: _cleanNullable(json['definition'] as String?),
+        example: _cleanNullable(json['example'] as String?),
+        exampleTranslation:
+            _cleanNullable(json['example_translation'] as String?),
         alternates: [
           for (final e in (json['alternates'] as List<dynamic>? ?? const []))
-            e as String,
+            if (e is String && cleanText(e).isNotEmpty) cleanText(e),
         ],
       );
     } on Exception {
       return null;
     }
+  }
+
+  static String? _cleanNullable(String? value) {
+    if (value == null) return null;
+    final cleaned = cleanText(value);
+    return cleaned.isEmpty ? null : cleaned;
   }
 }

@@ -74,6 +74,39 @@ void main() {
         isNull,
       );
     });
+
+    test('strips HTML markup from glosses, terms and part of speech', () {
+      final body = jsonEncode({
+        'sentences': [
+          {
+            'trans': '<b>سیب</b> <span class="gloss">قرمز</span>',
+            'orig': 'apple',
+          },
+        ],
+        'dict': [
+          {
+            'pos': '<i>noun</i>',
+            'terms': ['<a rel="x" href="/wiki/سیب">سیب</a>', '&quot;اپل&quot;'],
+            'entry': const [],
+          },
+        ],
+      });
+
+      final result = OnlineTranslationBackend.parseGoogleResponse(
+        body,
+        word: 'apple',
+        source: 'en',
+        target: 'fa',
+      );
+
+      expect(result, isNotNull);
+      expect(result!.translation, 'سیب قرمز');
+      expect(result.partOfSpeech, 'noun');
+      expect(result.alternates, contains('سیب'));
+      expect(result.alternates, contains('"اپل"'));
+      expect(result.translation, isNot(contains('<')),
+          reason: 'raw HTML must never reach the UI');
+    });
   });
 
   group('Wiktionary parsing', () {
@@ -98,6 +131,16 @@ void main() {
           'extract': 'Kein Artikel hier.',
         }),
         isNull,
+      );
+    });
+
+    test('genderFromSummary tolerates leading markup', () {
+      expect(
+        OnlineTranslationBackend.genderFromSummary({
+          'title': 'Haus',
+          'extract': '<span>Das Haus</span> ist ein Gebäude …',
+        }),
+        'das',
       );
     });
 
@@ -140,6 +183,34 @@ void main() {
       final result = OnlineTranslationBackend.firstDefinition(json, 'en');
       expect(result.definition, 'A round fruit.');
       expect(result.example, isNull);
+    });
+
+    test('firstDefinition strips HTML and wiki markup', () {
+      final json = {
+        'de': [
+          {
+            'partOfSpeech': 'Substantiv',
+            'language': 'Deutsch',
+            'definitions': [
+              {
+                'definition': '<i>Frucht</i> des Apfelbaums ({{botany}})',
+                'parsedExamples': [
+                  {
+                    'example':
+                        'Der <a rel="mw:WikiLink" href="/wiki/Apfel">Apfel</a> '
+                        'ist reif.',
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      final result = OnlineTranslationBackend.firstDefinition(json, 'de');
+      expect(result.definition, 'Frucht des Apfelbaums');
+      expect(result.example, 'Der Apfel ist reif.');
+      expect(result.definition, isNot(contains('<')));
+      expect(result.definition, isNot(contains('{{')));
     });
   });
 }

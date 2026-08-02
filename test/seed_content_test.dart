@@ -88,5 +88,27 @@ void main() {
         }
       }
     });
+
+    test('stories are rich: multiple chapters, many paragraphs, real length',
+        () {
+      for (final book in SeedContent.books) {
+        expect(book.chapters.length, greaterThanOrEqualTo(3),
+            reason: '${book.id} should have at least 3 chapters');
+        for (final chapter in book.chapters) {
+          expect(chapter.paragraphs.length, greaterThanOrEqualTo(3),
+              reason: '${book.id}/${chapter.id} should have 3+ paragraphs');
+          for (final paragraph in chapter.paragraphs) {
+            final words = paragraph.text
+                .split(RegExp(r'\s+'))
+                .where((w) => w.trim().isNotEmpty)
+                .length;
+            expect(words, greaterThanOrEqualTo(8),
+                reason: '${book.id}/${chapter.id} has a too-short paragraph');
+            expect(paragraph.translation!.length, greaterThanOrEqualTo(20),
+                reason: '${book.id}/${chapter.id} has a too-short translation');
+          }
+        }
+      }
+    });
   });
 }
