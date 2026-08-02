@@ -1,6 +1,8 @@
+import 'learning_state.dart';
+
 /// Serializable learning progress for a single user.
 class UserProgress {
-  const UserProgress({
+  UserProgress({
     this.xp = 0,
     this.streakDays = 0,
     this.lastActiveDay,
@@ -10,8 +12,15 @@ class UserProgress {
     this.bookProgress = const {},
     this.subscriptionActive = false,
     this.savedWords = const [],
-    this.leitnerBoxes = const {},
-  });
+    Map<String, int>? leitnerBoxes,
+    Map<String, LearningState>? learning,
+  })  : learning = learning ??
+            (leitnerBoxes == null
+                ? const {}
+                : {
+                    for (final e in leitnerBoxes.entries)
+                      e.key: LearningState.legacy(box: e.value),
+                  });
 
   final int xp;
   final int streakDays;
@@ -27,9 +36,14 @@ class UserProgress {
   /// Words the learner has bookmarked ("My Words").
   final List<String> savedWords;
 
-  /// word -> Leitner box (1..5). Box 1 is reviewed daily, box 5 the least
-  /// often. A word is inside the system iff it is a key of this map.
-  final Map<String, int> leitnerBoxes;
+  /// word -> spaced-repetition state (box, stage, interval, due, history).
+  /// A word is inside the review system iff it is a key of this map. This is
+  /// the canonical source of truth for vocabulary learning.
+  final Map<String, LearningState> learning;
+
+  /// Backwards-compatible view of [learning] as word -> Leitner box (1..5).
+  Map<String, int> get leitnerBoxes =>
+      {for (final e in learning.entries) e.key: e.value.box};
 
   int get stars => completedLessonIds.length;
 
@@ -43,7 +57,7 @@ class UserProgress {
     Map<String, int>? bookProgress,
     bool? subscriptionActive,
     List<String>? savedWords,
-    Map<String, int>? leitnerBoxes,
+    Map<String, LearningState>? learning,
   }) {
     return UserProgress(
       xp: xp ?? this.xp,
@@ -55,11 +69,13 @@ class UserProgress {
       bookProgress: bookProgress ?? this.bookProgress,
       subscriptionActive: subscriptionActive ?? this.subscriptionActive,
       savedWords: savedWords ?? this.savedWords,
-      leitnerBoxes: leitnerBoxes ?? this.leitnerBoxes,
+      learning: learning ?? this.learning,
     );
   }
 
   factory UserProgress.fromJson(Map<String, dynamic> json) {
+    final learningRaw = json['learning'] as Map<String, dynamic>?;
+    final legacy = json['leitner_boxes'] as Map<String, dynamic>? ?? const {};
     return UserProgress(
       xp: (json['xp'] as num?)?.toInt() ?? 0,
       streakDays: (json['streak_days'] as num?)?.toInt() ?? 0,
@@ -80,10 +96,18 @@ class UserProgress {
       savedWords: (json['saved_words'] as List<dynamic>? ?? const [])
           .map((e) => e as String)
           .toList(),
-      leitnerBoxes:
-          (json['leitner_boxes'] as Map<String, dynamic>? ?? const {}).map(
-        (key, value) => MapEntry(key, (value as num).toInt()),
-      ),
+      learning:
+          learningRaw != null && learningRaw.isNotEmpty
+              ? learningRaw.map(
+                  (key, value) => MapEntry(
+                    key,
+                    LearningState.fromJson(value as Map<String, dynamic>),
+                  ),
+                )
+              : {
+                  for (final e in legacy.entries)
+                    e.key: LearningState.legacy(box: (e.value as num).toInt()),
+                },
     );
   }
 
@@ -97,6 +121,9 @@ class UserProgress {
         'book_progress': bookProgress,
         'subscription_active': subscriptionActive,
         'saved_words': savedWords,
+        'learning': {
+          for (final e in learning.entries) e.key: e.value.toJson(),
+        },
         'leitner_boxes': leitnerBoxes,
       };
 }

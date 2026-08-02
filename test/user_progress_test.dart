@@ -4,7 +4,7 @@ import 'package:zova/data/models/user_progress.dart';
 void main() {
   group('UserProgress', () {
     test('round-trips through JSON', () {
-      const progress = UserProgress(
+      final progress = UserProgress(
         xp: 120,
         streakDays: 4,
         lastActiveDay: '2026-08-02',
@@ -32,7 +32,7 @@ void main() {
     });
 
     test('copyWith keeps untouched fields', () {
-      const progress = UserProgress(xp: 10);
+      final progress = UserProgress(xp: 10);
       final updated = progress.copyWith(wordsLearned: 3);
 
       expect(updated.xp, 10);

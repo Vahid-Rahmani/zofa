@@ -61,26 +61,53 @@ Architectural decisions:
 
 ## Current phase
 
-### Phase 2 — Learning / spaced-repetition engine (next)
+### Phase 2 — Learning / spaced-repetition engine
 
-Not started. Baseline already present: `AppController.saveWord`,
-`addToLeitner`, `removeSavedWord`, `reviewLeitnerCard`; `UserProgress` has
-`savedWords` and `leitnerBoxes`; Leitner screen exists.
+Status: **Complete** (implemented + verified; 58/58 tests green, analyze clean).
 
-Planned scope:
+- `lib/data/models/learning_state.dart`: `LearningStage` (`new` / `learning` /
+  `review` / `mastered`) and immutable `LearningState` — Leitner box, stage,
+  repetitions, interval days, SM-2 ease factor, due date, last-reviewed stamp,
+  correct/incorrect history. Graceful JSON round-trip; `LearningState.legacy`
+  migrates old box-only records (due immediately).
+- `lib/data/services/spaced_repetition.dart`: deterministic, clock-injected
+  scheduler (`now` closure injectable). Correct recall advances the box and
+  grows intervals SM-2-style (1, 6, then `interval * ease`, mastered at 21+
+  days); failure drops to box 1, resets repetitions, lowers ease (bounded to
+  1.3..2.5) and keeps the word due today for retry. Exposes `dueQueue` /
+  `dailyDueCount` / `isDue` for the daily review queue.
+- `UserProgress`: `leitnerBoxes` (word -> int) is now a *derived* view;
+  canonical storage is `learning` (word -> `LearningState`). Legacy
+  `leitner_boxes` JSON migrates automatically; `toJson` writes both for
+  backwards compatibility.
+- `AppController`: injected `SpacedRepetitionScheduler`; `addToLeitner` seeds a
+  fresh state, `reviewLeitnerCard` runs the scheduler, `removeFromLeitner`
+  drops it; `learningState` / `scheduler` exposed to UI and tests.
+- Leitner screen: stats card and box cards show "due today" counts driven by
+  the scheduler.
+- Tests (`test/spaced_repetition_test.dart`): new-state defaults, interval
+  growth to mastery, failure reset, ease bounds, max box, `dueQueue` ordering,
+  legacy migration, learning round-trip, and an `AppController` integration
+  test over a fixed clock.
 
-- Learning-state model: per-entry state (new / learning / review / mastered),
-  repetitions, interval, ease, due date, correct/incorrect history.
-- Scheduling: SM-2-style review scheduling with per-box intervals; daily due
-  queue; deterministic, clock-injected, unit-tested.
-- Wire state into `AppController` / `UserProgress` with persistence; expose a
-  clean API the review screen and dashboard read from.
-- Acceptance: scheduling tests green; analyze clean.
+Architectural decisions:
+
+- SM-2-style scheduling layered over the existing Leitner boxes (box drives the
+  UI grouping, SM-2 fields drive *when* a card is due).
+- Clock injected via closure so the engine is fully deterministic in tests.
+- Single source of truth: `learning` map; `leitnerBoxes` is a compatibility
+  view, so existing screens and saved data keep working.
+
+## Next phase
+
+### Phase 3 — Dashboard (next)
+
+Not started. Planned scope: progress overview (daily streak, words learned,
+due counts per box, per-level breakdown, recent activity), reading state from
+`AppController.progress` + `SpacedRepetitionScheduler.dailyDueCount`.
 
 ## Remaining phases
 
-- **Phase 3 — Dashboard**: progress overview (daily streak, words learned,
-  due counts, per-level breakdown).
 - **Phase 4 — Roadmap**: skill tree / level progression UI driven by learner
   state.
 - **Phase 5 — Mini-games**: recall games reusing dictionary + learning state.

@@ -31,6 +31,15 @@ class LeitnerBoxScreen extends StatelessWidget {
     final controller = context.watch<AppController>();
     final boxes = controller.progress.leitnerBoxes;
     final total = boxes.length;
+    final now = DateTime.now();
+    final dueByBox = <int, int>{1: 0, 2: 0, 3: 0, 4: 0, 5: 0};
+    var dueToday = 0;
+    for (final state in controller.progress.learning.values) {
+      if (state.isDueAt(now)) {
+        dueToday++;
+        dueByBox[state.box] = (dueByBox[state.box] ?? 0) + 1;
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Leitner Box')),
@@ -57,7 +66,7 @@ class LeitnerBoxScreen extends StatelessWidget {
                   style: TextStyle(color: ZovaColors.textSecondary, height: 1.4),
                 ),
                 const SizedBox(height: 18),
-                _BoxStatsCard(total: total),
+                _BoxStatsCard(total: total, dueToday: dueToday),
                 if (dict != null) ...[
                   const SizedBox(height: 16),
                   _WordPoolCard(dict: dict, controller: controller),
@@ -80,6 +89,7 @@ class LeitnerBoxScreen extends StatelessWidget {
                       box: box,
                       schedule: kLeitnerSchedule[box - 1],
                       count: boxes.values.where((b) => b == box).length,
+                      dueToday: dueByBox[box] ?? 0,
                       words: boxes.entries
                           .where((e) => e.value == box)
                           .map((e) => dict?.lookup(e.key))
@@ -316,9 +326,10 @@ class _WordPoolCardState extends State<_WordPoolCard> {
 }
 
 class _BoxStatsCard extends StatelessWidget {
-  const _BoxStatsCard({required this.total});
+  const _BoxStatsCard({required this.total, required this.dueToday});
 
   final int total;
+  final int dueToday;
 
   @override
   Widget build(BuildContext context) {
@@ -340,7 +351,9 @@ class _BoxStatsCard extends StatelessWidget {
             child: Text(
               total == 0
                   ? 'No words yet — add some to start reviewing.'
-                  : '$total words across your boxes',
+                  : dueToday == 0
+                      ? '$total words across your boxes'
+                      : '$total words · $dueToday due today',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 15,
@@ -400,6 +413,7 @@ class _BoxCard extends StatelessWidget {
     required this.box,
     required this.schedule,
     required this.count,
+    required this.dueToday,
     required this.words,
     required this.onStudy,
   });
@@ -407,6 +421,7 @@ class _BoxCard extends StatelessWidget {
   final int box;
   final String schedule;
   final int count;
+  final int dueToday;
   final List<DictionaryEntry> words;
   final void Function(List<DictionaryEntry> words) onStudy;
 
@@ -419,6 +434,10 @@ class _BoxCard extends StatelessWidget {
       4 => ZovaColors.secondary,
       _ => ZovaColors.success,
     };
+
+    final dueLabel = dueToday == 0
+        ? null
+        : ' · $dueToday due today';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -460,7 +479,7 @@ class _BoxCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$schedule · $count ${count == 1 ? 'word' : 'words'}',
+                  '$schedule · $count ${count == 1 ? 'word' : 'words'}$dueLabel',
                   style: const TextStyle(
                     fontSize: 13,
                     color: ZovaColors.textSecondary,

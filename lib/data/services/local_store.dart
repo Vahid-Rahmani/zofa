@@ -40,11 +40,11 @@ class LocalStore {
   static Future<UserProgress> getProgress() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kProgress);
-    if (raw == null) return const UserProgress();
+    if (raw == null) return UserProgress();
     try {
       return UserProgress.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (_) {
-      return const UserProgress();
+      return UserProgress();
     }
   }
 

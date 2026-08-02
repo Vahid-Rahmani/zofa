@@ -1,12 +1,14 @@
 import 'package:flutter/foundation.dart';
 
 import '../../data/models/app_user.dart';
+import '../../data/models/learning_state.dart';
 import '../../data/models/subscription_plan.dart';
 import '../../data/models/user_progress.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/progress_repository.dart';
 import '../../data/services/local_store.dart';
 import '../../data/services/remote_api.dart';
+import '../../data/services/spaced_repetition.dart';
 import '../../data/services/stripe_service.dart';
 
 /// Preferences gathered during onboarding.
@@ -31,16 +33,19 @@ class AppController extends ChangeNotifier {
     AuthRepository? auth,
     ProgressRepository? progress,
     StripeService? stripe,
+    SpacedRepetitionScheduler? scheduler,
   })  : _auth = auth ?? AuthRepository(),
         _progress = progress ?? ProgressRepository(),
-        _stripe = stripe ?? StripeService.instance;
+        _stripe = stripe ?? StripeService.instance,
+        _scheduler = scheduler ?? SpacedRepetitionScheduler();
 
   final AuthRepository _auth;
   final ProgressRepository _progress;
   final StripeService _stripe;
+  final SpacedRepetitionScheduler _scheduler;
 
   AppUser? _user;
-  UserProgress _progressData = const UserProgress();
+  UserProgress _progressData = UserProgress();
   bool _busy = false;
   bool _onboarded = false;
   bool _booted = false;
@@ -115,7 +120,7 @@ class AppController extends ChangeNotifier {
   Future<void> signOut() async {
     await _auth.signOut();
     _user = null;
-    _progressData = const UserProgress();
+    _progressData = UserProgress();
     notifyListeners();
   }
 
@@ -178,39 +183,49 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Puts [word] into the Leitner system at box 1 (reviewed daily).
+  /// Puts [word] into the spaced-repetition system at box 1 (due today).
   Future<void> addToLeitner(String word) async {
     final user = _user;
-    if (user == null || _progressData.leitnerBoxes.containsKey(word)) return;
+    if (user == null || _progressData.learning.containsKey(word)) return;
     _progressData = _progressData.copyWith(
-      leitnerBoxes: {..._progressData.leitnerBoxes, word: 1},
+      learning: {..._progressData.learning, word: _scheduler.newState()},
     );
     await _progress.saveProgress(user, _progressData);
     notifyListeners();
   }
 
-  /// Removes [word] from the Leitner system entirely.
+  /// Removes [word] from the spaced-repetition system entirely.
   Future<void> removeFromLeitner(String word) async {
     final user = _user;
     if (user == null) return;
-    final boxes = Map<String, int>.from(_progressData.leitnerBoxes)..remove(word);
-    _progressData = _progressData.copyWith(leitnerBoxes: boxes);
+    final learning = Map<String, LearningState>.from(_progressData.learning)
+      ..remove(word);
+    _progressData = _progressData.copyWith(learning: learning);
     await _progress.saveProgress(user, _progressData);
     notifyListeners();
   }
 
-  /// Records a Leitner answer for [word]: `knew` promotes it to the next box
-  /// (capped at 5), otherwise it drops back to box 1.
+  /// Records a review answer for [word]: a correct recall advances the
+  /// SM-2-style schedule (box up, interval grows, ease nudges up); a failure
+  /// resets the word to box 1 and keeps it due today so it can be retried.
   Future<void> reviewLeitnerCard(String word, {required bool knew}) async {
     final user = _user;
     if (user == null) return;
-    final boxes = Map<String, int>.from(_progressData.leitnerBoxes);
-    final current = boxes[word] ?? 1;
-    boxes[word] = knew ? (current < 5 ? current + 1 : 5) : 1;
-    _progressData = _progressData.copyWith(leitnerBoxes: boxes);
+    final current = _progressData.learning[word] ?? _scheduler.newState();
+    final learning = Map<String, LearningState>.from(_progressData.learning)
+      ..[word] = _scheduler.review(current, knew: knew);
+    _progressData = _progressData.copyWith(learning: learning);
     await _progress.saveProgress(user, _progressData);
     notifyListeners();
   }
+
+  /// The learning record for [word], or `null` when the word is not in the
+  /// review system.
+  LearningState? learningState(String word) => _progressData.learning[word];
+
+  /// The scheduler driving [reviewLeitnerCard] (exposed so the UI and tests
+  /// can read due counts from the same clock).
+  SpacedRepetitionScheduler get scheduler => _scheduler;
 
   /// Purchases [plan] through Stripe and unlocks premium access.
   Future<bool> purchase(SubscriptionPlan plan) async {
@@ -233,7 +248,7 @@ class AppController extends ChangeNotifier {
     if (_user != null) {
       _progressData = await _progress.loadProgress(_user!);
     } else {
-      _progressData = const UserProgress();
+      _progressData = UserProgress();
     }
   }
 
