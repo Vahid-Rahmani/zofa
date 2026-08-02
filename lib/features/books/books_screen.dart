@@ -22,29 +22,21 @@ class BooksScreen extends StatelessWidget {
     const levelOrder = ['A1', 'A2', 'B1'];
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Books'),
+        leading: BackButton(
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+      ),
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
             const SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(24, 20, 24, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Books',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: ZovaColors.textPrimary,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Tap any word to learn it.',
-                      style: TextStyle(color: ZovaColors.textSecondary),
-                    ),
-                  ],
+                padding: EdgeInsets.fromLTRB(24, 12, 24, 8),
+                child: Text(
+                  'Tap any word to learn it.',
+                  style: TextStyle(color: ZovaColors.textSecondary),
                 ),
               ),
             ),
