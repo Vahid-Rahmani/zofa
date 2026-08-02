@@ -15,6 +15,12 @@ class BooksScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = context.watch<AppController>();
 
+    final grouped = <String, List<Book>>{};
+    for (final book in SeedContent.books) {
+      grouped.putIfAbsent(book.level, () => []).add(book);
+    }
+    const levelOrder = ['A1', 'A2', 'B1'];
+
     return Scaffold(
       body: SafeArea(
         child: CustomScrollView(
@@ -42,35 +48,93 @@ class BooksScreen extends StatelessWidget {
                 ),
               ),
             ),
-            SliverPadding(
-              padding: const EdgeInsets.all(24),
-              sliver: SliverList.separated(
-                itemCount: SeedContent.books.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 14),
-                itemBuilder: (context, index) {
-                  final book = SeedContent.books[index];
-                  final lastRead =
-                      controller.progress.bookProgress[book.id] ?? -1;
-                  return _BookCard(
-                    book: book,
-                    progressLabel: lastRead >= 0
-                        ? 'Chapter ${lastRead + 1} of ${book.chapters.length}'
-                        : 'New',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => ReaderScreen(book: book),
-                        ),
+            for (final level in levelOrder)
+              if ((grouped[level] ?? const []).isNotEmpty) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+                    child: _LevelHeader(level: level),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  sliver: SliverList.separated(
+                    itemCount: grouped[level]!.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 14),
+                    itemBuilder: (context, index) {
+                      final book = grouped[level]![index];
+                      final lastRead =
+                          controller.progress.bookProgress[book.id] ?? -1;
+                      return _BookCard(
+                        book: book,
+                        progressLabel: lastRead >= 0
+                            ? 'Chapter ${lastRead + 1} of ${book.chapters.length}'
+                            : 'New',
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => ReaderScreen(book: book),
+                            ),
+                          );
+                        },
                       );
                     },
-                  );
-                },
-              ),
-            ),
+                  ),
+                ),
+              ],
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _LevelHeader extends StatelessWidget {
+  const _LevelHeader({required this.level});
+
+  final String level;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (level) {
+      'A1' => ZovaColors.success,
+      'A2' => ZovaColors.primary,
+      _ => ZovaColors.warning,
+    };
+    final label = switch (level) {
+      'A1' => 'A1 · Beginner',
+      'A2' => 'A2 · Elementary',
+      _ => 'B1 · Intermediate',
+    };
+    final count = SeedContent.books.where((b) => b.level == level).length;
+
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: ZovaColors.textPrimary,
+          ),
+        ),
+        const Spacer(),
+        Text(
+          '$count ${count == 1 ? 'book' : 'books'}',
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: ZovaColors.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 }

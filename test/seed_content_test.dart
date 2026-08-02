@@ -13,8 +13,9 @@ void main() {
       expect(course.nativeLanguage, 'Persian');
 
       for (final level in course.levels) {
-        expect(level.lessons, isNotEmpty,
-            reason: '${level.level} should not be empty');
+        expect(level.lessons.length, greaterThanOrEqualTo(9),
+            reason: '${level.level} should have at least 9 lessons, '
+                'found ${level.lessons.length}');
       }
     });
 
@@ -63,12 +64,12 @@ void main() {
         }
       }
 
-      expect(words.length, greaterThanOrEqualTo(100),
+      expect(words.length, greaterThanOrEqualTo(180),
           reason: 'expected hundreds of vocabulary words, found ${words.length}');
     });
 
     test('every book has chapters with text and Persian translation', () {
-      expect(SeedContent.books.length, greaterThanOrEqualTo(6));
+      expect(SeedContent.books.length, greaterThanOrEqualTo(9));
 
       for (final book in SeedContent.books) {
         expect(['A1', 'A2', 'B1'], contains(book.level),

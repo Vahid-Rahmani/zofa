@@ -4,7 +4,15 @@ import 'package:zova/data/services/dictionary.dart';
 void main() {
   group('Dictionary', () {
     test('contains hundreds of entries', () {
-      expect(Dictionary.wordCount, greaterThanOrEqualTo(150));
+      expect(Dictionary.wordCount, greaterThanOrEqualTo(300));
+    });
+
+    test('every level holds a rich word pool', () {
+      for (final level in ['A1', 'A2', 'B1']) {
+        final entries = Dictionary.byLevel(level);
+        expect(entries.length, greaterThanOrEqualTo(80),
+            reason: '$level should have at least 80 words, found ${entries.length}');
+      }
     });
 
     test('every entry is complete and level-tagged', () {
@@ -55,6 +63,9 @@ void main() {
       final byPersian = Dictionary.search('آب');
       expect(byPersian, isNotEmpty);
       expect(byPersian.any((e) => e.word == 'water'), isTrue);
+      expect(byPersian.every((e) => e.translation.contains('آب')), isTrue);
+      expect(byPersian.length, lessThan(Dictionary.wordCount),
+          reason: 'a Persian query should filter, not return everything');
       expect(Dictionary.search(''), Dictionary.all);
     });
   });

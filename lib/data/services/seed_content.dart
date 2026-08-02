@@ -26,6 +26,8 @@ abstract final class SeedContent {
     _gardenOfTheOldHouse,
     _letterFromLisbon,
     _placeToStart,
+    _lostWallet,
+    _nightInTheCity,
   ];
 
   // ---------------------------------------------------------------------------
@@ -107,6 +109,20 @@ abstract final class SeedContent {
             level: 'A1',
             topics: ['verbs'],
           ),
+          _lesson(
+            id: 'lesson_a1_daily_routine',
+            title: 'Daily Routine',
+            icon: '⏰',
+            level: 'A1',
+            topics: ['routine', 'time'],
+          ),
+          _lesson(
+            id: 'lesson_a1_clothes',
+            title: 'Clothes',
+            icon: '👗',
+            level: 'A1',
+            topics: ['clothes'],
+          ),
         ],
       ),
       CourseLevel(
@@ -173,6 +189,20 @@ abstract final class SeedContent {
             level: 'A2',
             topics: ['emotions'],
           ),
+          _lesson(
+            id: 'lesson_a2_animals_nature',
+            title: 'Animals & Nature',
+            icon: '🐾',
+            level: 'A2',
+            topics: ['animals', 'nature'],
+          ),
+          _lesson(
+            id: 'lesson_a2_around_town',
+            title: 'Around Town',
+            icon: '🏙️',
+            level: 'A2',
+            topics: ['places'],
+          ),
         ],
       ),
       CourseLevel(
@@ -238,6 +268,20 @@ abstract final class SeedContent {
             icon: '🎯',
             level: 'B1',
             topics: ['goals'],
+          ),
+          _lesson(
+            id: 'lesson_b1_money_finance',
+            title: 'Money & Finance',
+            icon: '💳',
+            level: 'B1',
+            topics: ['finance', 'money'],
+          ),
+          _lesson(
+            id: 'lesson_b1_travel_culture',
+            title: 'Travel & Culture',
+            icon: '🌍',
+            level: 'B1',
+            topics: ['culture', 'travel'],
           ),
         ],
       ),
@@ -805,6 +849,134 @@ abstract final class SeedContent {
           BookParagraph(
             text: 'Every big journey begins with one small step.',
             translation: 'هر سفر بزرگ با یک قدم کوچک آغاز میشود.',
+          ),
+        ],
+      ),
+    ],
+  );
+
+  static const Book _lostWallet = Book(
+    id: 'book_lost_wallet',
+    title: 'The Lost Wallet',
+    author: 'zova Studio',
+    description: 'Sara finds a wallet on the street and decides to find its owner.',
+    cover: '👛',
+    difficulty: 'Elementary',
+    level: 'A2',
+    chapters: [
+      BookChapter(
+        id: 'ch_wallet_1',
+        title: 'On the sidewalk',
+        paragraphs: [
+          BookParagraph(
+            text: 'On the way home from school, Sara saw a black wallet on the sidewalk.',
+            translation: 'در راه خانه از مدرسه، سارا یک کیف پول سیاه روی پیادهرو دید.',
+          ),
+          BookParagraph(
+            text: 'She opened it carefully. There was money, a card, and an address.',
+            translation: 'با دقت آن را باز کرد. داخلش پول، یک کارت و یک آدرس بود.',
+          ),
+        ],
+      ),
+      BookChapter(
+        id: 'ch_wallet_2',
+        title: 'The address',
+        paragraphs: [
+          BookParagraph(
+            text: 'The address was not far away, just two streets from the park.',
+            translation: 'آدرس خیلی دور نبود، فقط دو خیابان آن طرفتر از پارک بود.',
+          ),
+          BookParagraph(
+            text: 'Sara walked to the house and rang the bell.',
+            translation: 'سارا به آن خانه رفت و زنگ را زد.',
+          ),
+          BookParagraph(
+            text: 'An old woman opened the door and touched her own pocket.',
+            translation: 'پیرزنی در را باز کرد و دست به جیب خودش برد.',
+          ),
+        ],
+      ),
+      BookChapter(
+        id: 'ch_wallet_3',
+        title: 'A warm thanks',
+        paragraphs: [
+          BookParagraph(
+            text: '"This is my wallet!" she said. "I lost it this morning."',
+            translation: 'گفت: «این کیف پول من است! امروز صبح آن را گم کردم.»',
+          ),
+          BookParagraph(
+            text: 'She invited Sara in and gave her a glass of fresh juice.',
+            translation: 'او سارا را به خانه دعوت کرد و یک لیوان آبمیوه تازه به او داد.',
+          ),
+          BookParagraph(
+            text: 'Sara felt that a small kind act makes a whole day brighter.',
+            translation: 'سارا احساس کرد یک کار کوچک و مهربانانه، کل روز را روشنتر میکند.',
+          ),
+        ],
+      ),
+    ],
+  );
+
+  static const Book _nightInTheCity = Book(
+    id: 'book_night_city',
+    title: 'A Night in the City',
+    author: 'zova Studio',
+    description: 'Two friends explore their hometown by night and see it with new eyes.',
+    cover: '🌃',
+    difficulty: 'Intermediate',
+    level: 'B1',
+    chapters: [
+      BookChapter(
+        id: 'ch_city_1',
+        title: 'A different city',
+        paragraphs: [
+          BookParagraph(
+            text: 'Amir had lived in the city all his life, but he had never seen it at night.',
+            translation: 'امیر تمام عمرش را در این شهر زندگی کرده بود، اما هرگز آن را شب ندیده بود.',
+          ),
+          BookParagraph(
+            text: 'His friend Leila suggested a walk across the old bridge.',
+            translation: 'دوستش لیلا پیشنهاد داد از روی پل قدیمی قدم بزنند.',
+          ),
+          BookParagraph(
+            text: 'The lights of the houses were reflected in the dark water.',
+            translation: 'نور خانهها در آب تاریک بازتاب میافتاد.',
+          ),
+        ],
+      ),
+      BookChapter(
+        id: 'ch_city_2',
+        title: 'Hidden stories',
+        paragraphs: [
+          BookParagraph(
+            text: 'Every building seemed to carry a story, a memory, a promise.',
+            translation: 'به نظر میرسید هر ساختمان یک داستان، یک خاطره و یک قول با خود دارد.',
+          ),
+          BookParagraph(
+            text: 'They passed the old cinema, the market square, and the garden of roses.',
+            translation: 'آنها از سینمای قدیمی، میدان بازار و باغ گلهای رز رد شدند.',
+          ),
+          BookParagraph(
+            text: 'Leila told stories about each place that Amir had never heard before.',
+            translation: 'لیلا دربارهی هر مکان داستانهایی تعریف کرد که امیر قبلاً هرگز نشنیده بود.',
+          ),
+        ],
+      ),
+      BookChapter(
+        id: 'ch_city_3',
+        title: 'New eyes',
+        paragraphs: [
+          BookParagraph(
+            text: 'By midnight, Amir realized he had been blind to his own hometown.',
+            translation: 'نزدیک نیمهشب، امیر فهمید که نسبت به زادگاه خودش نابینا بوده است.',
+          ),
+          BookParagraph(
+            text: '"Sometimes you have to change your view to see what was always there."',
+            translation: '«گاهی باید دیدت را عوض کنی تا ببینی چه چیزی همیشه آنجا بوده است.»',
+          ),
+          BookParagraph(
+            text: 'They promised to explore a new corner of the city every month.',
+            translation: 'آنها قول دادند هر ماه یک گوشهی جدید از شهر را کشف کنند.',
           ),
         ],
       ),

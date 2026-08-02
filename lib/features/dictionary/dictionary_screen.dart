@@ -17,15 +17,36 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   final _searchController = TextEditingController();
   String _query = '';
 
+  /// Selected CEFR level; `null` means all levels.
+  String? _level;
+
+  /// Whether the German dictionary is shown instead of the English one.
+  bool _isGerman = false;
+
+  List<DictionaryEntry> get _all => _isGerman ? GermanDictionary.all : Dictionary.all;
+
+  List<DictionaryEntry> get _results {
+    final base = _query.trim().isEmpty
+        ? _all
+        : _isGerman
+            ? GermanDictionary.search(_query)
+            : Dictionary.search(_query);
+    if (_level == null) return base;
+    return base.where((e) => e.level == _level).toList();
+  }
+
+  int _countFor(String level) =>
+      (_isGerman ? GermanDictionary.byLevel(level) : Dictionary.byLevel(level))
+          .length;
+
+  int get _wordCount => _isGerman ? GermanDictionary.wordCount : Dictionary.wordCount;
+
+  String get _languageLabel => _isGerman ? 'German → Persian' : 'English → Persian';
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
-  }
-
-  List<DictionaryEntry> get _results {
-    final base = _query.trim().isEmpty ? Dictionary.all : Dictionary.search(_query);
-    return base;
   }
 
   @override
@@ -52,8 +73,45 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${Dictionary.wordCount} words · English → Persian',
+                    '$_wordCount words · $_languageLabel',
                     style: const TextStyle(color: ZovaColors.textSecondary),
+                  ),
+                  const SizedBox(height: 12),
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(
+                        value: false,
+                        label: Text('English'),
+                        icon: Icon(Icons.translate, size: 18),
+                      ),
+                      ButtonSegment(
+                        value: true,
+                        label: Text('German'),
+                        icon: Icon(Icons.translate, size: 18),
+                      ),
+                    ],
+                    selected: {_isGerman},
+                    onSelectionChanged: (selection) =>
+                        setState(() => _isGerman = selection.first),
+                    style: ButtonStyle(
+                      visualDensity: VisualDensity.compact,
+                      textStyle: WidgetStateProperty.all(
+                        const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
+                      backgroundColor: WidgetStateProperty.resolveWith(
+                        (states) => states.contains(WidgetState.selected)
+                            ? ZovaColors.primary
+                            : ZovaColors.surface,
+                      ),
+                      foregroundColor: WidgetStateProperty.resolveWith(
+                        (states) => states.contains(WidgetState.selected)
+                            ? Colors.white
+                            : ZovaColors.textSecondary,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -83,6 +141,41 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     borderSide: BorderSide.none,
                   ),
                 ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  _LevelFilterChip(
+                    label: 'All',
+                    count: _wordCount,
+                    selected: _level == null,
+                    onTap: () => setState(() => _level = null),
+                  ),
+                  const SizedBox(width: 8),
+                  _LevelFilterChip(
+                    label: 'A1',
+                    count: _countFor('A1'),
+                    selected: _level == 'A1',
+                    onTap: () => setState(() => _level = 'A1'),
+                  ),
+                  const SizedBox(width: 8),
+                  _LevelFilterChip(
+                    label: 'A2',
+                    count: _countFor('A2'),
+                    selected: _level == 'A2',
+                    onTap: () => setState(() => _level = 'A2'),
+                  ),
+                  const SizedBox(width: 8),
+                  _LevelFilterChip(
+                    label: 'B1',
+                    count: _countFor('B1'),
+                    selected: _level == 'B1',
+                    onTap: () => setState(() => _level = 'B1'),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 12),
@@ -124,6 +217,68 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                         );
                       },
                     ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LevelFilterChip extends StatelessWidget {
+  const _LevelFilterChip({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (label) {
+      'A1' => ZovaColors.success,
+      'A2' => ZovaColors.primary,
+      'B1' => ZovaColors.warning,
+      _ => ZovaColors.textSecondary,
+    };
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? color : ZovaColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? color : ZovaColors.textSecondary.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : ZovaColors.textPrimary,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '$count',
+              style: TextStyle(
+                color: selected
+                    ? Colors.white.withValues(alpha: 0.9)
+                    : ZovaColors.textSecondary,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
             ),
           ],
         ),
