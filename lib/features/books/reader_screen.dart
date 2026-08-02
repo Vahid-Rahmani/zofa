@@ -5,6 +5,7 @@ import '../../core/state/app_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../data/models/book.dart';
 import '../../data/services/dictionary.dart';
+import '../../data/services/dictionary_service.dart';
 
 /// Interactive reader: paragraphs are rendered as tappable text so the user
 /// can look up any word and grow their vocabulary while reading. A toggle
@@ -23,9 +24,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
   late final PageController _pageController;
   bool _showPersian = false;
 
+  /// The loaded dictionary, once available. Drives which words are highlighted
+  /// as tappable look-ups in the reader.
+  DictionaryService? _dict;
+
   @override
   void initState() {
     super.initState();
+    Dictionary.service.then((dict) {
+      if (mounted) setState(() => _dict = dict);
+    });
     final controller = context.read<AppController>();
     _chapterIndex =
         (controller.progress.bookProgress[widget.book.id] ?? 0)
@@ -47,7 +55,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Future<void> _showWordSheet(String word) async {
-    final entry = Dictionary.lookup(word);
+    final dict = await Dictionary.service;
+    final entry = dict.lookup(word);
+    if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: ZovaColors.surfaceRaised,
@@ -193,6 +203,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
               chapter: widget.book.chapters[chapterIndex],
               onWordTap: _showWordSheet,
               showPersian: _showPersian,
+              dict: _dict,
             );
           },
         ),
@@ -252,11 +263,13 @@ class _ParagraphPage extends StatelessWidget {
     required this.chapter,
     required this.onWordTap,
     required this.showPersian,
+    required this.dict,
   });
 
   final BookChapter chapter;
   final ValueChanged<String> onWordTap;
   final bool showPersian;
+  final DictionaryService? dict;
 
   @override
   Widget build(BuildContext context) {
@@ -309,6 +322,7 @@ class _ParagraphPage extends StatelessWidget {
                 child: _TappableParagraph(
                   text: paragraph.text,
                   onWordTap: onWordTap,
+                  dict: dict,
                 ),
               ),
         ],
@@ -318,10 +332,15 @@ class _ParagraphPage extends StatelessWidget {
 }
 
 class _TappableParagraph extends StatelessWidget {
-  const _TappableParagraph({required this.text, required this.onWordTap});
+  const _TappableParagraph({
+    required this.text,
+    required this.onWordTap,
+    required this.dict,
+  });
 
   final String text;
   final ValueChanged<String> onWordTap;
+  final DictionaryService? dict;
 
   @override
   Widget build(BuildContext context) {
@@ -339,7 +358,7 @@ class _TappableParagraph extends StatelessWidget {
               ),
             );
           }
-          final hasTranslation = Dictionary.lookup(token.word) != null;
+          final hasTranslation = dict?.lookup(token.word) != null;
           return WidgetSpan(
             child: GestureDetector(
               onTap: () => onWordTap(token.word),

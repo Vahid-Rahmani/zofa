@@ -12,10 +12,11 @@ class DictionaryEntry {
     required this.example,
     required this.exampleTranslation,
     this.phonetic,
+    this.gender,
     this.topics = const [],
   });
 
-  /// The English headword (lowercase).
+  /// The headword (lowercase for English, capitalised for German nouns).
   final String word;
 
   /// Accurate Persian (Farsi) translation.
@@ -27,7 +28,7 @@ class DictionaryEntry {
   /// CEFR proficiency level: `A1`, `A2` or `B1`.
   final String level;
 
-  /// Practical English example sentence showing real usage.
+  /// Practical example sentence showing real usage.
   final String example;
 
   /// Persian translation of [example].
@@ -35,6 +36,10 @@ class DictionaryEntry {
 
   /// Optional IPA-ish pronunciation hint.
   final String? phonetic;
+
+  /// Grammatical gender of German nouns (`der`, `die`, `das`); `null` for
+  /// words without a gender.
+  final String? gender;
 
   /// Topic tags used to build lessons, e.g. `greetings`, `travel`.
   final List<String> topics;
@@ -48,6 +53,7 @@ class DictionaryEntry {
       example: json['example'] as String,
       exampleTranslation: json['example_translation'] as String,
       phonetic: json['phonetic'] as String?,
+      gender: json['gender'] as String?,
       topics: (json['topics'] as List<dynamic>? ?? const [])
           .map((e) => e as String)
           .toList(),
@@ -62,6 +68,7 @@ class DictionaryEntry {
         'example': example,
         'example_translation': exampleTranslation,
         'phonetic': phonetic,
+        'gender': gender,
         'topics': topics,
       };
 }

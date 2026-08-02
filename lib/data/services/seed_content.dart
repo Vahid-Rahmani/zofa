@@ -4,7 +4,8 @@ import '../models/book.dart';
 import '../models/course.dart';
 import '../models/dictionary_entry.dart';
 import '../models/exercise.dart';
-import 'dictionary_data.dart';
+import 'dictionary.dart';
+import 'dictionary_service.dart';
 
 /// Bundled educational content for zova.
 ///
@@ -16,7 +17,6 @@ import 'dictionary_data.dart';
 /// All models are JSON-serialisable, so this content can later move to the
 /// backend and be fetched per course without touching the UI.
 abstract final class SeedContent {
-  static final List<Course> courses = [_essentialEnglish];
   static final List<Book> books = [
     _littleLight,
     _walkInThePark,
@@ -34,9 +34,18 @@ abstract final class SeedContent {
   // Course
   // ---------------------------------------------------------------------------
 
-  static final Course _essentialEnglish = Course(
-    id: 'course_english_essential',
-    title: 'Essential English',
+  /// Builds the English roadmap course. Lessons and their exercises are
+  /// generated from the bundled [Dictionary.service], so the JSON dictionary
+  /// stays the single source of truth for vocabulary.
+  static Future<Course> englishCourse() async {
+    final dict = await Dictionary.service;
+    return _essentialEnglish(dict);
+  }
+
+  static Course _essentialEnglish(DictionaryService dict) {
+    return Course(
+      id: 'course_english_essential',
+      title: 'Essential English',
     description:
         'A complete roadmap for Persian speakers: foundations (A1), everyday '
         'English (A2) and confident English (B1), with hundreds of words, real '
@@ -54,6 +63,7 @@ abstract final class SeedContent {
         description: 'Greetings, numbers, family and the most useful words.',
         lessons: [
           _lesson(
+            dict: dict,
             id: 'lesson_a1_greetings',
             title: 'Greetings',
             icon: '👋',
@@ -61,6 +71,7 @@ abstract final class SeedContent {
             topics: ['greetings'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a1_introductions',
             title: 'Introductions',
             icon: '🤝',
@@ -68,6 +79,7 @@ abstract final class SeedContent {
             topics: ['introductions', 'polite'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a1_numbers_days',
             title: 'Numbers & Days',
             icon: '🔢',
@@ -75,6 +87,7 @@ abstract final class SeedContent {
             topics: ['numbers', 'days', 'time'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a1_family_people',
             title: 'Family & People',
             icon: '👨‍👩‍👧',
@@ -82,6 +95,7 @@ abstract final class SeedContent {
             topics: ['family', 'people'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a1_home_objects',
             title: 'Home & Objects',
             icon: '🏠',
@@ -89,6 +103,7 @@ abstract final class SeedContent {
             topics: ['home', 'objects'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a1_food_drink',
             title: 'Food & Drink',
             icon: '🍎',
@@ -96,6 +111,7 @@ abstract final class SeedContent {
             topics: ['food', 'drinks'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a1_colors_descriptions',
             title: 'Colors & Descriptions',
             icon: '🎨',
@@ -103,6 +119,7 @@ abstract final class SeedContent {
             topics: ['colors', 'descriptions'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a1_everyday_verbs',
             title: 'Everyday Verbs',
             icon: '🏃',
@@ -110,6 +127,7 @@ abstract final class SeedContent {
             topics: ['verbs'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a1_daily_routine',
             title: 'Daily Routine',
             icon: '⏰',
@@ -117,6 +135,7 @@ abstract final class SeedContent {
             topics: ['routine', 'time'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a1_clothes',
             title: 'Clothes',
             icon: '👗',
@@ -134,6 +153,7 @@ abstract final class SeedContent {
             'Shopping, travel, health, work and the language of daily life.',
         lessons: [
           _lesson(
+            dict: dict,
             id: 'lesson_a2_shopping_money',
             title: 'Shopping & Money',
             icon: '🛍️',
@@ -141,6 +161,7 @@ abstract final class SeedContent {
             topics: ['shopping', 'money'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a2_travel_directions',
             title: 'Travel & Directions',
             icon: '✈️',
@@ -148,6 +169,7 @@ abstract final class SeedContent {
             topics: ['travel', 'directions'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a2_weather_seasons',
             title: 'Weather & Seasons',
             icon: '🌦️',
@@ -155,6 +177,7 @@ abstract final class SeedContent {
             topics: ['weather', 'seasons'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a2_health_body',
             title: 'Health & Body',
             icon: '❤️',
@@ -162,6 +185,7 @@ abstract final class SeedContent {
             topics: ['health', 'body'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a2_hobbies_freetime',
             title: 'Hobbies & Free Time',
             icon: '🎨',
@@ -169,6 +193,7 @@ abstract final class SeedContent {
             topics: ['hobbies'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a2_work_jobs',
             title: 'Work & Jobs',
             icon: '💼',
@@ -176,6 +201,7 @@ abstract final class SeedContent {
             topics: ['jobs'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a2_restaurant',
             title: 'At the Restaurant',
             icon: '🍽️',
@@ -183,6 +209,7 @@ abstract final class SeedContent {
             topics: ['restaurant'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a2_emotions',
             title: 'Emotions & Feelings',
             icon: '😊',
@@ -190,6 +217,7 @@ abstract final class SeedContent {
             topics: ['emotions'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a2_animals_nature',
             title: 'Animals & Nature',
             icon: '🐾',
@@ -197,6 +225,7 @@ abstract final class SeedContent {
             topics: ['animals', 'nature'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_a2_around_town',
             title: 'Around Town',
             icon: '🏙️',
@@ -214,6 +243,7 @@ abstract final class SeedContent {
             'Career, studies, opinions and the skills for real conversations.',
         lessons: [
           _lesson(
+            dict: dict,
             id: 'lesson_b1_career',
             title: 'Career & Workplace',
             icon: '📈',
@@ -221,6 +251,7 @@ abstract final class SeedContent {
             topics: ['career'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_b1_education',
             title: 'Education & Study',
             icon: '🎓',
@@ -228,6 +259,7 @@ abstract final class SeedContent {
             topics: ['education'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_b1_media_news',
             title: 'Media & News',
             icon: '📰',
@@ -235,6 +267,7 @@ abstract final class SeedContent {
             topics: ['media'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_b1_relationships',
             title: 'Relationships & Social Life',
             icon: '💞',
@@ -242,6 +275,7 @@ abstract final class SeedContent {
             topics: ['relationships'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_b1_opinions',
             title: 'Opinions & Debates',
             icon: '💭',
@@ -249,6 +283,7 @@ abstract final class SeedContent {
             topics: ['opinions'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_b1_lifestyle',
             title: 'Health & Lifestyle',
             icon: '🌿',
@@ -256,6 +291,7 @@ abstract final class SeedContent {
             topics: ['lifestyle'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_b1_technology',
             title: 'Technology & Internet',
             icon: '💻',
@@ -263,6 +299,7 @@ abstract final class SeedContent {
             topics: ['technology'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_b1_goals',
             title: 'Future Plans & Goals',
             icon: '🎯',
@@ -270,6 +307,7 @@ abstract final class SeedContent {
             topics: ['goals'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_b1_money_finance',
             title: 'Money & Finance',
             icon: '💳',
@@ -277,6 +315,7 @@ abstract final class SeedContent {
             topics: ['finance', 'money'],
           ),
           _lesson(
+            dict: dict,
             id: 'lesson_b1_travel_culture',
             title: 'Travel & Culture',
             icon: '🌍',
@@ -287,36 +326,39 @@ abstract final class SeedContent {
       ),
     ],
   );
+  }
 
   /// Builds one lesson from the dictionary entries that match [level] and any
   /// of [topics], then generates a full set of interactive exercises.
   static Lesson _lesson({
+    required DictionaryService dict,
     required String id,
     required String title,
     required String icon,
     required String level,
     required List<String> topics,
   }) {
-    final words = DictionaryData.entries
+    final words = dict.entries
         .where((e) => e.level == level && topics.any(e.topics.contains))
         .toList();
     return Lesson(
       id: id,
       title: title,
       icon: icon,
-      exercises: _exercises(words, level, id),
+      exercises: _exercises(words, dict, level, id),
     );
   }
 
   static List<Exercise> _exercises(
     List<DictionaryEntry> words,
+    DictionaryService dict,
     String level,
     String lessonId,
   ) {
     const target = 8;
     final words1 = List<DictionaryEntry>.from(words);
     if (words1.length < target) {
-      final extras = DictionaryData.entries
+      final extras = dict.entries
           .where((e) => e.level == level && !words1.contains(e))
           .take(target - words1.length);
       words1.addAll(extras);
@@ -340,7 +382,7 @@ abstract final class SeedContent {
           prompt: 'What does "${w.word}" mean?',
           options: _distractors(
             correct: w.translation,
-            pool: _translationsOf(level),
+            pool: _translationsOf(dict, level),
             seed: w.word.length + selected.indexOf(w) * 7 + lessonId.length,
           ),
           correctAnswer: w.translation,
@@ -373,7 +415,7 @@ abstract final class SeedContent {
           prompt: '«${w.translation}» یعنی چه؟',
           options: _distractors(
             correct: w.word,
-            pool: _wordsOf(level),
+            pool: _wordsOf(dict, level),
             seed: w.translation.length * 3 + lessonId.length + 11,
           ),
           correctAnswer: w.word,
@@ -384,11 +426,11 @@ abstract final class SeedContent {
     return exercises;
   }
 
-  static List<String> _translationsOf(String level) =>
-      DictionaryData.entries.where((e) => e.level == level).map((e) => e.translation).toList();
+  static List<String> _translationsOf(DictionaryService dict, String level) =>
+      dict.entries.where((e) => e.level == level).map((e) => e.translation).toList();
 
-  static List<String> _wordsOf(String level) =>
-      DictionaryData.entries.where((e) => e.level == level).map((e) => e.word).toList();
+  static List<String> _wordsOf(DictionaryService dict, String level) =>
+      dict.entries.where((e) => e.level == level).map((e) => e.word).toList();
 
   /// Returns [correct] plus up to three unique distractors, shuffled with a
   /// deterministic seed so lesson content stays stable between runs.

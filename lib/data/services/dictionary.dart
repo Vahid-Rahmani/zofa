@@ -1,48 +1,28 @@
-import '../models/dictionary_entry.dart';
-import 'dictionary_data.dart';
 import 'dictionary_service.dart';
-import 'german_dictionary_data.dart';
 
-/// The built-in English -> Persian dictionary.
+/// The built-in English -> Persian dictionary, loaded lazily from the bundled
+/// JSON asset. Await [service] once and reuse the returned [DictionaryService]
+/// for all lookups and searches.
 abstract final class Dictionary {
-  static final DictionaryService service =
-      DictionaryService(DictionaryData.entries);
+  static const String _assetPath = 'assets/dictionary/english.json';
 
-  static List<DictionaryEntry> get all => service.all;
+  static Future<DictionaryService>? _cache;
 
-  static int get wordCount => service.wordCount;
-
-  static int get exampleCount => service.exampleCount;
-
-  static DictionaryEntry? lookup(String word) => service.lookup(word);
-
-  static String? translation(String word) => service.translation(word);
-
-  static List<DictionaryEntry> byLevel(String level) =>
-      service.byLevel(level);
-
-  static List<DictionaryEntry> search(String query) =>
-      service.search(query);
+  /// Memoised async loader: resolves to the shared [DictionaryService] the
+  /// first time it is awaited, then returns the same instance.
+  static Future<DictionaryService> get service =>
+      _cache ??= DictionaryService.loadAsset(_assetPath);
 }
 
-/// The built-in German -> Persian dictionary.
+/// The built-in German -> Persian dictionary, loaded lazily from the bundled
+/// JSON asset. Entries for German nouns carry their grammatical gender
+/// (`der`/`die`/`das`) so courses and the UI can teach articles.
 abstract final class GermanDictionary {
-  static final DictionaryService service =
-      DictionaryService(GermanDictionaryData.entries);
+  static const String _assetPath = 'assets/dictionary/german.json';
 
-  static List<DictionaryEntry> get all => service.all;
+  static Future<DictionaryService>? _cache;
 
-  static int get wordCount => service.wordCount;
-
-  static int get exampleCount => service.exampleCount;
-
-  static DictionaryEntry? lookup(String word) => service.lookup(word);
-
-  static String? translation(String word) => service.translation(word);
-
-  static List<DictionaryEntry> byLevel(String level) =>
-      service.byLevel(level);
-
-  static List<DictionaryEntry> search(String query) =>
-      service.search(query);
+  /// Memoised async loader for the German dictionary.
+  static Future<DictionaryService> get service =>
+      _cache ??= DictionaryService.loadAsset(_assetPath);
 }

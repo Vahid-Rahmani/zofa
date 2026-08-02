@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../data/models/dictionary_entry.dart';
 import '../../data/services/dictionary.dart';
+import '../../data/services/dictionary_service.dart';
 
 /// The Dictionary tab: searchable English -> Persian dictionary with hundreds
 /// of entries, each carrying an example sentence and a proficiency level.
@@ -23,25 +24,20 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   /// Whether the German dictionary is shown instead of the English one.
   bool _isGerman = false;
 
-  List<DictionaryEntry> get _all => _isGerman ? GermanDictionary.all : Dictionary.all;
+  late final Future<DictionaryService> _english = Dictionary.service;
+  late final Future<DictionaryService> _german = GermanDictionary.service;
 
-  List<DictionaryEntry> get _results {
-    final base = _query.trim().isEmpty
-        ? _all
-        : _isGerman
-            ? GermanDictionary.search(_query)
-            : Dictionary.search(_query);
+  List<DictionaryEntry> _resultsFor(DictionaryService dict) {
+    final base = _query.trim().isEmpty ? dict.all : dict.search(_query);
     if (_level == null) return base;
     return base.where((e) => e.level == _level).toList();
   }
 
-  int _countFor(String level) =>
-      (_isGerman ? GermanDictionary.byLevel(level) : Dictionary.byLevel(level))
-          .length;
+  int _countFor(DictionaryService dict, String level) =>
+      dict.byLevel(level).length;
 
-  int get _wordCount => _isGerman ? GermanDictionary.wordCount : Dictionary.wordCount;
-
-  String get _languageLabel => _isGerman ? 'German → Persian' : 'English → Persian';
+  String get _languageLabel =>
+      _isGerman ? 'German → Persian' : 'English → Persian';
 
   @override
   void dispose() {
@@ -51,7 +47,22 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final results = _results;
+    final future = _isGerman ? _german : _english;
+    return FutureBuilder<DictionaryService>(
+      future: future,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return _buildBody(context, snapshot.data!);
+      },
+    );
+  }
+
+  Widget _buildBody(BuildContext context, DictionaryService dict) {
+    final results = _resultsFor(dict);
 
     return Scaffold(
       body: SafeArea(
@@ -73,7 +84,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '$_wordCount words · $_languageLabel',
+                    '${dict.wordCount} words · $_languageLabel',
                     style: const TextStyle(color: ZovaColors.textSecondary),
                   ),
                   const SizedBox(height: 12),
@@ -150,28 +161,28 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 children: [
                   _LevelFilterChip(
                     label: 'All',
-                    count: _wordCount,
+                    count: dict.wordCount,
                     selected: _level == null,
                     onTap: () => setState(() => _level = null),
                   ),
                   const SizedBox(width: 8),
                   _LevelFilterChip(
                     label: 'A1',
-                    count: _countFor('A1'),
+                    count: _countFor(dict, 'A1'),
                     selected: _level == 'A1',
                     onTap: () => setState(() => _level = 'A1'),
                   ),
                   const SizedBox(width: 8),
                   _LevelFilterChip(
                     label: 'A2',
-                    count: _countFor('A2'),
+                    count: _countFor(dict, 'A2'),
                     selected: _level == 'A2',
                     onTap: () => setState(() => _level = 'A2'),
                   ),
                   const SizedBox(width: 8),
                   _LevelFilterChip(
                     label: 'B1',
-                    count: _countFor('B1'),
+                    count: _countFor(dict, 'B1'),
                     selected: _level == 'B1',
                     onTap: () => setState(() => _level = 'B1'),
                   ),
@@ -319,7 +330,9 @@ class _EntryCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          entry.partOfSpeech,
+                          entry.gender == null
+                              ? entry.partOfSpeech
+                              : '${entry.gender} · ${entry.partOfSpeech}',
                           style: TextStyle(
                             fontSize: 12,
                             fontStyle: FontStyle.italic,
@@ -433,7 +446,9 @@ class EntryDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              entry.partOfSpeech,
+              entry.gender == null
+                  ? entry.partOfSpeech
+                  : '${entry.gender} · ${entry.partOfSpeech}',
               style: const TextStyle(
                 fontStyle: FontStyle.italic,
                 color: ZovaColors.textSecondary,

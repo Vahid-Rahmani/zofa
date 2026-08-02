@@ -12,13 +12,33 @@ import 'lesson/lesson_screen.dart';
 ///
 /// Lessons unlock sequentially across the whole roadmap: a lesson is playable
 /// only when the previous lesson in the flat course order is completed.
-class CoursesScreen extends StatelessWidget {
+class CoursesScreen extends StatefulWidget {
   const CoursesScreen({super.key});
 
   @override
+  State<CoursesScreen> createState() => _CoursesScreenState();
+}
+
+class _CoursesScreenState extends State<CoursesScreen> {
+  late final Future<Course> _course = SeedContent.englishCourse();
+
+  @override
   Widget build(BuildContext context) {
+    return FutureBuilder<Course>(
+      future: _course,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return _buildRoadmap(context, snapshot.data!);
+      },
+    );
+  }
+
+  Widget _buildRoadmap(BuildContext context, Course course) {
     final controller = context.watch<AppController>();
-    final course = SeedContent.courses.first;
     final completedIds = controller.progress.completedLessonIds;
 
     final roadmap = <_RoadmapEntry>[];

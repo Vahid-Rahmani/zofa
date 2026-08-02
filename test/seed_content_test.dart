@@ -1,13 +1,19 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zova/data/models/course.dart';
 import 'package:zova/data/models/exercise.dart';
 import 'package:zova/data/services/seed_content.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late Course course;
+
+  setUpAll(() async {
+    course = await SeedContent.englishCourse();
+  });
+
   group('SeedContent integrity', () {
     test('exposes a single course with A1, A2 and B1 levels in order', () {
-      expect(SeedContent.courses, hasLength(1));
-      final course = SeedContent.courses.first;
-
       expect(course.levels.map((l) => l.level), ['A1', 'A2', 'B1']);
       expect(course.language, 'English');
       expect(course.nativeLanguage, 'Persian');
@@ -20,8 +26,7 @@ void main() {
     });
 
     test('every course lesson exercise is well-formed', () {
-      final allExercises = SeedContent.courses
-          .expand((course) => course.levels)
+      final allExercises = course.levels
           .expand((level) => level.lessons)
           .expand((lesson) => lesson.exercises)
           .toList();
@@ -52,13 +57,11 @@ void main() {
 
     test('course vocabulary covers hundreds of distinct words', () {
       final words = <String>{};
-      for (final course in SeedContent.courses) {
-        for (final level in course.levels) {
-          for (final lesson in level.lessons) {
-            for (final exercise in lesson.exercises) {
-              if (exercise.type == ExerciseType.flashcard) {
-                words.addAll(exercise.words);
-              }
+      for (final level in course.levels) {
+        for (final lesson in level.lessons) {
+          for (final exercise in lesson.exercises) {
+            if (exercise.type == ExerciseType.flashcard) {
+              words.addAll(exercise.words);
             }
           }
         }

@@ -1,18 +1,65 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart' show SynchronousFuture, visibleForTesting;
+import 'package:flutter/services.dart' show rootBundle;
+
 import '../models/dictionary_entry.dart';
 
 /// In-memory index over a set of [DictionaryEntry]s for one source language.
 ///
-/// Powers the Dictionary tab, the word-tap lookups in the reader and the
-/// lesson builder. A service is immutable once created: it only caches the
-/// lookup index lazily.
+/// A service is immutable once created: it only caches the lookup index
+/// lazily. It powers the Dictionary tab, the word-tap lookups in the reader
+/// and the lesson builder. The word data itself lives in JSON assets (see
+/// [loadAsset]) so thousands of entries load quickly without cluttering the
+/// Dart source tree.
 class DictionaryService {
   DictionaryService(this._entries);
+
+  /// Parses a JSON array of entry objects produced by `DictionaryEntry.toJson`.
+  factory DictionaryService.fromJsonString(String json) {
+    final decoded = jsonDecode(json) as List<dynamic>;
+    final entries = [
+      for (final item in decoded) DictionaryEntry.fromJson(item as Map<String, dynamic>),
+    ];
+    return DictionaryService(entries);
+  }
+
+  /// Overrides used by tests to serve assets synchronously, so widget tests
+  /// never depend on real file I/O (which cannot complete under the fake
+  /// async test clock). Not used in production.
+  static final Map<String, String> _assetOverrides = {};
+
+  /// Seeds the bundled JSON contents for [path] for the current test.
+  @visibleForTesting
+  static void seedAsset(String path, String jsonContents) {
+    _assetOverrides[path] = jsonContents;
+  }
+
+  /// Asynchronously loads and parses a bundled JSON dictionary asset. When a
+  /// test seeded [path] via [seedAsset] the value completes synchronously.
+  static Future<DictionaryService> loadAsset(String path) {
+    final override = _assetOverrides[path];
+    if (override != null) {
+      return SynchronousFuture<DictionaryService>(
+        DictionaryService.fromJsonString(override),
+      );
+    }
+    return _loadFromBundle(path);
+  }
+
+  static Future<DictionaryService> _loadFromBundle(String path) async {
+    final raw = await rootBundle.loadString(path);
+    return DictionaryService.fromJsonString(raw);
+  }
 
   final List<DictionaryEntry> _entries;
 
   late final Map<String, DictionaryEntry> _byWord = {
     for (final entry in _entries) _normalize(entry.word): entry,
   };
+
+  /// Every entry in its original (curated) order.
+  List<DictionaryEntry> get entries => List.unmodifiable(_entries);
 
   /// Every entry, sorted alphabetically.
   List<DictionaryEntry> get all =>
