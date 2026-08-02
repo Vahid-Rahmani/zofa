@@ -12,7 +12,7 @@ import '../../data/services/stripe_service.dart';
 /// Preferences gathered during onboarding.
 class OnboardingPrefs {
   const OnboardingPrefs({
-    this.nativeLanguage = 'German',
+    this.nativeLanguage = 'Persian',
     this.level = 'beginner',
     this.motivation = 'travel',
   });

@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../../core/theme/zova_colors.dart';
 import '../books/books_screen.dart';
 import '../courses/courses_screen.dart';
+import '../dictionary/dictionary_screen.dart';
 import '../profile/profile_screen.dart';
 
-/// Main logged-in shell with the three primary tabs.
+/// Main logged-in shell with the primary tabs.
 class HomeShell extends StatelessWidget {
   const HomeShell({super.key});
 
@@ -28,6 +29,7 @@ class _HomeShellBodyState extends State<_HomeShellBody> {
   static const _tabs = [
     CoursesScreen(),
     BooksScreen(),
+    DictionaryScreen(),
     ProfileScreen(),
   ];
 
@@ -58,6 +60,11 @@ class _HomeShellBodyState extends State<_HomeShellBody> {
             icon: Icon(Icons.menu_book_outlined),
             selectedIcon: Icon(Icons.menu_book),
             label: 'Books',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.translate),
+            selectedIcon: Icon(Icons.translate),
+            label: 'Dictionary',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

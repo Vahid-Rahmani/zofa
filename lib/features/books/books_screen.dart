@@ -124,9 +124,17 @@ class _BookCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      '${book.author} · ${book.difficulty}',
-                      style: const TextStyle(color: ZovaColors.textSecondary),
+                    Row(
+                      children: [
+                        Text(
+                          '${book.author} · ${book.difficulty}',
+                          style: const TextStyle(
+                            color: ZovaColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _LevelChip(level: book.level),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -145,6 +153,36 @@ class _BookCard extends StatelessWidget {
               const Icon(Icons.chevron_right, color: ZovaColors.textSecondary),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LevelChip extends StatelessWidget {
+  const _LevelChip({required this.level});
+
+  final String level;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (level) {
+      'A1' => ZovaColors.success,
+      'A2' => ZovaColors.primary,
+      _ => ZovaColors.warning,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Text(
+        level,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w800,
+          fontSize: 11,
         ),
       ),
     );

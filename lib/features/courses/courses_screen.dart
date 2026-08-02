@@ -9,6 +9,9 @@ import 'lesson/lesson_screen.dart';
 
 /// The Courses tab: shows the roadmap with levels and lessons plus the
 /// user's streak and daily progress.
+///
+/// Lessons unlock sequentially across the whole roadmap: a lesson is playable
+/// only when the previous lesson in the flat course order is completed.
 class CoursesScreen extends StatelessWidget {
   const CoursesScreen({super.key});
 
@@ -18,22 +21,42 @@ class CoursesScreen extends StatelessWidget {
     final course = SeedContent.courses.first;
     final completedIds = controller.progress.completedLessonIds;
 
+    final roadmap = <_RoadmapEntry>[];
+    for (final level in course.levels) {
+      for (final lesson in level.lessons) {
+        roadmap.add(_RoadmapEntry(level: level, lesson: lesson));
+      }
+    }
+
+    final levelStarts = <int>[];
+    var running = 0;
+    for (final level in course.levels) {
+      levelStarts.add(running);
+      running += level.lessons.length;
+    }
+
     return Scaffold(
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(
               child: _Header(
+                language: course.language,
                 streak: controller.progress.streakDays,
                 xp: controller.progress.xp,
                 completed: completedIds.length,
                 total: course.totalLessons,
               ),
             ),
-            for (final level in course.levels)
+            for (final (index, level) in course.levels.indexed)
               SliverToBoxAdapter(
                 child: _LevelSection(
                   level: level,
+                  entries: roadmap
+                      .where((entry) => entry.level == level)
+                      .toList(),
+                  roadmap: roadmap,
+                  startIndex: levelStarts[index],
                   completedIds: completedIds,
                 ),
               ),
@@ -45,14 +68,23 @@ class CoursesScreen extends StatelessWidget {
   }
 }
 
+class _RoadmapEntry {
+  const _RoadmapEntry({required this.level, required this.lesson});
+
+  final CourseLevel level;
+  final Lesson lesson;
+}
+
 class _Header extends StatelessWidget {
   const _Header({
+    required this.language,
     required this.streak,
     required this.xp,
     required this.completed,
     required this.total,
   });
 
+  final String language;
   final int streak;
   final int xp;
   final int completed;
@@ -69,20 +101,20 @@ class _Header extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Learn English',
-                      style: TextStyle(
+                      'Learn $language',
+                      style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
                         color: ZovaColors.textPrimary,
                       ),
                     ),
-                    SizedBox(height: 4),
-                    Text(
+                    const SizedBox(height: 4),
+                    const Text(
                       'Small steps, every day.',
                       style: TextStyle(color: ZovaColors.textSecondary),
                     ),
@@ -191,43 +223,117 @@ class _StatChip extends StatelessWidget {
 }
 
 class _LevelSection extends StatelessWidget {
-  const _LevelSection({required this.level, required this.completedIds});
+  const _LevelSection({
+    required this.level,
+    required this.entries,
+    required this.roadmap,
+    required this.completedIds,
+    required this.startIndex,
+  });
 
   final CourseLevel level;
+  final List<_RoadmapEntry> entries;
+  final List<_RoadmapEntry> roadmap;
   final List<String> completedIds;
+  final int startIndex;
 
   @override
   Widget build(BuildContext context) {
+    final done =
+        entries.where((e) => completedIds.contains(e.lesson.id)).length;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              Text(level.icon, style: const TextStyle(fontSize: 22)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      level.title,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: ZovaColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      level.description.isEmpty
+                          ? '${level.lessons.length} lessons'
+                          : level.description,
+                      style: const TextStyle(color: ZovaColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              _LevelBadge(level: level.level),
+            ],
+          ),
+          const SizedBox(height: 6),
           Text(
-            level.title,
+            '$done of ${entries.length} lessons done',
             style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: ZovaColors.textPrimary,
+              color: ZovaColors.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            '${level.lessons.length} lessons',
-            style: const TextStyle(color: ZovaColors.textSecondary),
-          ),
           const SizedBox(height: 12),
-          for (final (index, lesson) in level.lessons.indexed)
+          for (final (index, entry) in entries.indexed)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _LessonCard(
-                lesson: lesson,
-                isCompleted: completedIds.contains(lesson.id),
-                isLocked: index > 0 &&
-                    !completedIds.contains(level.lessons[index - 1].id),
+                lesson: entry.lesson,
+                isCompleted: completedIds.contains(entry.lesson.id),
+                isLocked: _isLocked(startIndex + index),
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// A lesson is locked unless it is the first of the whole course or its
+  /// globally preceding lesson is completed.
+  bool _isLocked(int globalIndex) {
+    if (globalIndex == 0) return false;
+    final previous = roadmap[globalIndex - 1].lesson.id;
+    return !completedIds.contains(previous);
+  }
+}
+
+class _LevelBadge extends StatelessWidget {
+  const _LevelBadge({required this.level});
+
+  final String level;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (level) {
+      'A1' => ZovaColors.success,
+      'A2' => ZovaColors.primary,
+      _ => ZovaColors.warning,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        level,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w800,
+          fontSize: 13,
+        ),
       ),
     );
   }

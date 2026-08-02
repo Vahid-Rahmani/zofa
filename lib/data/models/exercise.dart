@@ -22,6 +22,7 @@ class Exercise {
     this.correctAnswer,
     this.pairs = const {},
     this.words = const [],
+    this.examples = const {},
   });
 
   final ExerciseType type;
@@ -34,6 +35,9 @@ class Exercise {
 
   /// Words to study in a [ExerciseType.flashcard].
   final List<String> words;
+
+  /// Word -> practical English example sentence shown on flashcards.
+  final Map<String, String> examples;
 
   /// Human readable label used in the exercise header.
   String get title => switch (type) {

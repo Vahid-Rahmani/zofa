@@ -31,7 +31,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _controller = PageController();
   int _page = 0;
 
-  String _nativeLanguage = 'German';
+  String _nativeLanguage = 'Persian';
   String _level = 'beginner';
   String _motivation = 'travel';
 
@@ -196,7 +196,13 @@ class _PrefsPage extends StatelessWidget {
           const SizedBox(height: 32),
           _PrefsBlock(
             title: 'Your language',
-            options: const ['German', 'French', 'Spanish', 'Portuguese'],
+            options: const [
+              'Persian',
+              'German',
+              'French',
+              'Spanish',
+              'Portuguese',
+            ],
             selected: nativeLanguage,
             onChanged: onNativeChanged,
           ),

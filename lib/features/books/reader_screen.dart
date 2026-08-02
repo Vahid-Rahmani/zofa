@@ -7,7 +7,8 @@ import '../../data/models/book.dart';
 import '../../data/services/dictionary.dart';
 
 /// Interactive reader: paragraphs are rendered as tappable text so the user
-/// can look up any word and grow their vocabulary while reading.
+/// can look up any word and grow their vocabulary while reading. A toggle
+/// switches between the English text and its Persian translation.
 class ReaderScreen extends StatefulWidget {
   const ReaderScreen({super.key, required this.book});
 
@@ -20,6 +21,7 @@ class ReaderScreen extends StatefulWidget {
 class _ReaderScreenState extends State<ReaderScreen> {
   late int _chapterIndex;
   late final PageController _pageController;
+  bool _showPersian = false;
 
   @override
   void initState() {
@@ -45,7 +47,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Future<void> _showWordSheet(String word) async {
-    final translation = Dictionary.lookup(word);
+    final entry = Dictionary.lookup(word);
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: ZovaColors.surfaceRaised,
@@ -58,27 +60,80 @@ class _ReaderScreenState extends State<ReaderScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              word,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: ZovaColors.textPrimary,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    word,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: ZovaColors.textPrimary,
+                    ),
+                  ),
+                ),
+                if (entry != null) _LevelPill(level: entry.level),
+              ],
             ),
+            if (entry?.phonetic != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                entry!.phonetic!,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: ZovaColors.textSecondary,
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             Text(
-              translation ?? 'Not in this course yet.',
+              entry?.translation ?? 'Not in the dictionary yet.',
+              textDirection: entry == null ? null : TextDirection.rtl,
               style: TextStyle(
                 fontSize: 18,
-                color: translation == null
+                fontWeight: FontWeight.w700,
+                color: entry == null
                     ? ZovaColors.textSecondary
                     : ZovaColors.primary,
               ),
             ),
-            const SizedBox(height: 16),
+            if (entry != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: ZovaColors.surface,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '“${entry.example}”',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        height: 1.5,
+                        color: ZovaColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      entry.exampleTranslation,
+                      textDirection: TextDirection.rtl,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        height: 1.5,
+                        color: ZovaColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
             Text(
-              'Tip: this word appears in your course vocabulary.',
+              'Tap any English word in the story to see its meaning.',
               style: TextStyle(
                 fontSize: 12,
                 color: ZovaColors.textSecondary.withValues(alpha: 0.7),
@@ -108,6 +163,25 @@ class _ReaderScreenState extends State<ReaderScreen> {
             ),
           ],
         ),
+        actions: [
+          TextButton.icon(
+            onPressed: () => setState(() => _showPersian = !_showPersian),
+            icon: Icon(
+              _showPersian ? Icons.language : Icons.g_translate,
+              color: _showPersian ? ZovaColors.secondary : ZovaColors.textSecondary,
+              size: 20,
+            ),
+            label: Text(
+              _showPersian ? 'Persian' : 'English',
+              style: TextStyle(
+                color: _showPersian
+                    ? ZovaColors.secondary
+                    : ZovaColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: PageView.builder(
@@ -118,6 +192,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
             return _ParagraphPage(
               chapter: widget.book.chapters[chapterIndex],
               onWordTap: _showWordSheet,
+              showPersian: _showPersian,
             );
           },
         ),
@@ -142,11 +217,46 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 }
 
+class _LevelPill extends StatelessWidget {
+  const _LevelPill({required this.level});
+
+  final String level;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (level) {
+      'A1' => ZovaColors.success,
+      'A2' => ZovaColors.primary,
+      _ => ZovaColors.warning,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        level,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w800,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
 class _ParagraphPage extends StatelessWidget {
-  const _ParagraphPage({required this.chapter, required this.onWordTap});
+  const _ParagraphPage({
+    required this.chapter,
+    required this.onWordTap,
+    required this.showPersian,
+  });
 
   final BookChapter chapter;
   final ValueChanged<String> onWordTap;
+  final bool showPersian;
 
   @override
   Widget build(BuildContext context) {
@@ -164,14 +274,43 @@ class _ParagraphPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          for (final paragraph in chapter.paragraphs)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 18),
-              child: _TappableParagraph(
-                text: paragraph.text,
-                onWordTap: onWordTap,
+          if (showPersian)
+            for (final paragraph in chapter.paragraphs)
+              if (paragraph.translation != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 18),
+                  child: Text(
+                    paragraph.translation!,
+                    textDirection: TextDirection.rtl,
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      height: 1.8,
+                      color: ZovaColors.textPrimary,
+                    ),
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 18),
+                  child: Text(
+                    paragraph.text,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      height: 1.6,
+                      color: ZovaColors.textPrimary,
+                    ),
+                  ),
+                )
+          else
+            for (final paragraph in chapter.paragraphs)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 18),
+                child: _TappableParagraph(
+                  text: paragraph.text,
+                  onWordTap: onWordTap,
+                ),
               ),
-            ),
         ],
       ),
     );

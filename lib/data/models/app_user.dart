@@ -6,7 +6,7 @@ class AppUser {
     this.displayName,
     this.avatarEmoji = '🚀',
     this.learnedLanguage = 'English',
-    this.nativeLanguage = 'German',
+    this.nativeLanguage = 'Persian',
     this.level = 'beginner',
   });
 
@@ -45,7 +45,7 @@ class AppUser {
       displayName: json['display_name'] as String?,
       avatarEmoji: (json['avatar_emoji'] as String?) ?? '🚀',
       learnedLanguage: (json['learned_language'] as String?) ?? 'English',
-      nativeLanguage: (json['native_language'] as String?) ?? 'German',
+      nativeLanguage: (json['native_language'] as String?) ?? 'Persian',
       level: (json['level'] as String?) ?? 'beginner',
     );
   }

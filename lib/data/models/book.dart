@@ -1,14 +1,23 @@
 /// A paragraph of text inside a book chapter.
 class BookParagraph {
-  const BookParagraph({required this.text});
+  const BookParagraph({required this.text, this.translation});
 
   final String text;
 
+  /// Persian translation of [text] for bilingual reading mode.
+  final String? translation;
+
   factory BookParagraph.fromJson(Map<String, dynamic> json) {
-    return BookParagraph(text: json['text'] as String);
+    return BookParagraph(
+      text: json['text'] as String,
+      translation: json['translation'] as String?,
+    );
   }
 
-  Map<String, dynamic> toJson() => {'text': text};
+  Map<String, dynamic> toJson() => {
+        'text': text,
+        'translation': translation,
+      };
 }
 
 /// A chapter is a sequence of paragraphs; the reader tracks progress in it.
@@ -50,6 +59,7 @@ class Book {
     required this.cover,
     required this.difficulty,
     required this.chapters,
+    this.level = 'A1',
   });
 
   final String id;
@@ -58,6 +68,10 @@ class Book {
   final String description;
   final String cover;
   final String difficulty;
+
+  /// CEFR level of the story: `A1`, `A2` or `B1`.
+  final String level;
+
   final List<BookChapter> chapters;
 
   factory Book.fromJson(Map<String, dynamic> json) {
@@ -68,6 +82,7 @@ class Book {
       description: json['description'] as String,
       cover: (json['cover'] as String?) ?? '📘',
       difficulty: (json['difficulty'] as String?) ?? 'Beginner',
+      level: (json['level'] as String?) ?? 'A1',
       chapters: (json['chapters'] as List<dynamic>)
           .map((e) => BookChapter.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -81,6 +96,7 @@ class Book {
         'description': description,
         'cover': cover,
         'difficulty': difficulty,
+        'level': level,
         'chapters': chapters.map((e) => e.toJson()).toList(),
       };
 }

@@ -1,32 +1,59 @@
-import '../models/course.dart';
-import 'seed_content.dart';
+import '../models/dictionary_entry.dart';
+import 'dictionary_data.dart';
 
-/// A small inline dictionary built from all words taught in the bundled
-/// courses. In production this can be replaced by a remote dictionary lookup.
+/// The built-in English -> Persian dictionary.
+///
+/// Indexed in memory from [DictionaryData]. Powers the Dictionary tab, the
+/// word-tap lookups in the reader and the lesson builder.
 abstract final class Dictionary {
-  static final Map<String, String> _entries = _build();
+  static final Map<String, DictionaryEntry> _byWord = {
+    for (final entry in DictionaryData.entries) entry.word: entry,
+  };
 
-  /// Returns the translation for [word], or null when unknown.
-  static String? lookup(String word) {
-    final normalized = word.toLowerCase().trim();
-    return _entries[normalized];
+  /// Every entry, sorted alphabetically.
+  static List<DictionaryEntry> get all => List.unmodifiable(
+        [...DictionaryData.entries]..sort((a, b) => a.word.compareTo(b.word)),
+      );
+
+  /// Number of headwords in the dictionary.
+  static int get wordCount => DictionaryData.entries.length;
+
+  /// Number of entries that teach an English example sentence.
+  static int get exampleCount =>
+      DictionaryData.entries.where((e) => e.example.isNotEmpty).length;
+
+  /// Looks up [word] case-insensitively, ignoring punctuation and articles.
+  static DictionaryEntry? lookup(String word) {
+    final normalized = _normalize(word);
+    if (normalized.isEmpty) return null;
+    return _byWord[normalized];
   }
 
-  static Map<String, String> _build() {
-    final map = <String, String>{};
-    for (final course in SeedContent.courses) {
-      _collectCourse(course, map);
-    }
-    return map;
+  /// Convenience: the Persian translation of [word], when known.
+  static String? translation(String word) => lookup(word)?.translation;
+
+  /// Filters entries by CEFR [level] (`A1`, `A2`, `B1`).
+  static List<DictionaryEntry> byLevel(String level) => List.unmodifiable(
+        DictionaryData.entries.where((e) => e.level == level),
+      );
+
+  /// Fuzzy search across headwords, translations and examples.
+  static List<DictionaryEntry> search(String query) {
+    final q = _normalize(query);
+    if (q.isEmpty) return all;
+    return List.unmodifiable(
+      DictionaryData.entries.where((e) =>
+          e.word.contains(q) ||
+          e.translation.contains(q) ||
+          e.example.toLowerCase().contains(q)),
+    );
   }
 
-  static void _collectCourse(Course course, Map<String, String> map) {
-    for (final level in course.levels) {
-      for (final lesson in level.lessons) {
-        for (final exercise in lesson.exercises) {
-          map.addAll(exercise.pairs);
-        }
-      }
-    }
+  static String _normalize(String raw) {
+    return raw
+        .toLowerCase()
+        .replaceAll(RegExp(r"[^a-z\u00e4\u00e9\u00fc\s]+"), ' ')
+        .trim()
+        .replaceAll(RegExp(r"\s{2,}"), ' ');
   }
 }

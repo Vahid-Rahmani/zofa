@@ -70,7 +70,7 @@ class _TranslateViewState extends State<TranslateView> {
             onSubmitted: (_) => _check(),
             decoration: const InputDecoration(
               labelText: 'Type the translation',
-              hintText: 'e.g. hallo',
+              hintText: 'e.g. سلام',
             ),
           ),
           const SizedBox(height: 16),

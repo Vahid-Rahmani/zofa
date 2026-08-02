@@ -27,6 +27,7 @@ void main() {
           prompt: 'Learn these words',
           words: ['hello', 'goodbye'],
           pairs: {'hello': 'hallo', 'goodbye': 'auf Wiedersehen'},
+          examples: {'hello': 'Hello, how are you?', 'goodbye': 'Goodbye!'},
         ),
       ];
 
@@ -38,6 +39,7 @@ void main() {
         expect(restored.correctAnswer, exercise.correctAnswer);
         expect(restored.pairs, exercise.pairs);
         expect(restored.words, exercise.words);
+        expect(restored.examples, exercise.examples);
       }
     });
   });

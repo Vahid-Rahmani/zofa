@@ -18,6 +18,9 @@ abstract final class ExerciseParser {
       words: (json['words'] as List<dynamic>? ?? const [])
           .map((e) => e as String)
           .toList(),
+      examples: (json['examples'] as Map<String, dynamic>? ?? const {}).map(
+        (key, value) => MapEntry(key, value as String),
+      ),
     );
   }
 
@@ -29,6 +32,7 @@ abstract final class ExerciseParser {
       'correct_answer': e.correctAnswer,
       'pairs': e.pairs,
       'words': e.words,
+      'examples': e.examples,
     };
   }
 }
