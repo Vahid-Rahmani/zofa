@@ -36,8 +36,14 @@ abstract final class SeedContent {
 
   /// Builds the English roadmap course. Lessons and their exercises are
   /// generated from the bundled [Dictionary.service], so the JSON dictionary
-  /// stays the single source of truth for vocabulary.
-  static Future<Course> englishCourse() async {
+  /// stays the single source of truth for vocabulary. Memoised so the Home
+  /// dashboard and the Courses tab share one loaded course.
+  static Future<Course>? _englishCourseCache;
+
+  static Future<Course> englishCourse() =>
+      _englishCourseCache ??= _loadEnglishCourse();
+
+  static Future<Course> _loadEnglishCourse() async {
     final dict = await Dictionary.service;
     return _essentialEnglish(dict);
   }

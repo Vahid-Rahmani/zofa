@@ -63,10 +63,23 @@ void main() {
     await tester.tap(find.text('Create account'));
     await tester.pumpAndSettle();
 
-    // Signed in -> home shell with the Courses tab.
-    expect(find.text('Learn English'), findsOneWidget);
-    expect(find.text('Roadmap'), findsOneWidget);
-    expect(find.text('Books'), findsOneWidget);
+    // Signed in -> home shell with the Home dashboard tab.
+    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('Courses'), findsOneWidget);
+    expect(find.text('Dictionary'), findsOneWidget);
     expect(find.text('Profile'), findsOneWidget);
+    expect(find.text('Vocabulary'), findsOneWidget);
+    expect(find.text('Listening & Reading'), findsOneWidget);
+    expect(find.text('Grammar'), findsOneWidget);
+
+    // The Quick access grid sits below the fold; scroll it into view.
+    await tester.scrollUntilVisible(
+      find.text('Leitner Box'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Leitner Box'), findsOneWidget);
+    expect(find.text('My Words'), findsOneWidget);
+    expect(find.text('Shop'), findsOneWidget);
   });
 }

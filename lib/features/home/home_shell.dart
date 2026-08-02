@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/zova_colors.dart';
-import '../books/books_screen.dart';
 import '../courses/courses_screen.dart';
 import '../dictionary/dictionary_screen.dart';
 import '../profile/profile_screen.dart';
+import 'home_screen.dart';
 
 /// Main logged-in shell with the primary tabs.
 class HomeShell extends StatelessWidget {
@@ -26,11 +26,11 @@ class _HomeShellBody extends StatefulWidget {
 class _HomeShellBodyState extends State<_HomeShellBody> {
   int _index = 0;
 
-  static const _tabs = [
-    CoursesScreen(),
-    BooksScreen(),
-    DictionaryScreen(),
-    ProfileScreen(),
+  late final List<Widget> _tabs = [
+    HomeScreen(onNavigateToTab: (index) => setState(() => _index = index)),
+    const CoursesScreen(),
+    const DictionaryScreen(),
+    const ProfileScreen(),
   ];
 
   @override
@@ -52,14 +52,14 @@ class _HomeShellBodyState extends State<_HomeShellBody> {
         }),
         destinations: const [
           NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.map_outlined),
             selectedIcon: Icon(Icons.map),
             label: 'Courses',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.menu_book_outlined),
-            selectedIcon: Icon(Icons.menu_book),
-            label: 'Books',
           ),
           NavigationDestination(
             icon: Icon(Icons.translate),

@@ -1,17 +1,21 @@
 import 'dictionary_service.dart';
 
 /// The built-in English -> Persian dictionary, loaded lazily from the bundled
-/// JSON asset. Await [service] once and reuse the returned [DictionaryService]
-/// for all lookups and searches.
+/// JSON asset and its pre-built index sidecar. Await [service] once and reuse
+/// the returned [DictionaryService] for all lookups and searches.
 abstract final class Dictionary {
   static const String _assetPath = 'assets/dictionary/english.json';
+  static const String _indexPath = 'assets/dictionary/english.index.json';
 
   static Future<DictionaryService>? _cache;
 
   /// Memoised async loader: resolves to the shared [DictionaryService] the
   /// first time it is awaited, then returns the same instance.
   static Future<DictionaryService> get service =>
-      _cache ??= DictionaryService.loadAsset(_assetPath);
+      _cache ??= DictionaryService.loadPack(
+        entriesPath: _assetPath,
+        indexPath: _indexPath,
+      );
 }
 
 /// The built-in German -> Persian dictionary, loaded lazily from the bundled
@@ -19,10 +23,14 @@ abstract final class Dictionary {
 /// (`der`/`die`/`das`) so courses and the UI can teach articles.
 abstract final class GermanDictionary {
   static const String _assetPath = 'assets/dictionary/german.json';
+  static const String _indexPath = 'assets/dictionary/german.index.json';
 
   static Future<DictionaryService>? _cache;
 
   /// Memoised async loader for the German dictionary.
   static Future<DictionaryService> get service =>
-      _cache ??= DictionaryService.loadAsset(_assetPath);
+      _cache ??= DictionaryService.loadPack(
+        entriesPath: _assetPath,
+        indexPath: _indexPath,
+      );
 }

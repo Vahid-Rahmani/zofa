@@ -9,6 +9,8 @@ class UserProgress {
     this.favoriteBooks = const [],
     this.bookProgress = const {},
     this.subscriptionActive = false,
+    this.savedWords = const [],
+    this.leitnerBoxes = const {},
   });
 
   final int xp;
@@ -22,6 +24,13 @@ class UserProgress {
   final Map<String, int> bookProgress;
   final bool subscriptionActive;
 
+  /// Words the learner has bookmarked ("My Words").
+  final List<String> savedWords;
+
+  /// word -> Leitner box (1..5). Box 1 is reviewed daily, box 5 the least
+  /// often. A word is inside the system iff it is a key of this map.
+  final Map<String, int> leitnerBoxes;
+
   int get stars => completedLessonIds.length;
 
   UserProgress copyWith({
@@ -33,6 +42,8 @@ class UserProgress {
     List<String>? favoriteBooks,
     Map<String, int>? bookProgress,
     bool? subscriptionActive,
+    List<String>? savedWords,
+    Map<String, int>? leitnerBoxes,
   }) {
     return UserProgress(
       xp: xp ?? this.xp,
@@ -43,6 +54,8 @@ class UserProgress {
       favoriteBooks: favoriteBooks ?? this.favoriteBooks,
       bookProgress: bookProgress ?? this.bookProgress,
       subscriptionActive: subscriptionActive ?? this.subscriptionActive,
+      savedWords: savedWords ?? this.savedWords,
+      leitnerBoxes: leitnerBoxes ?? this.leitnerBoxes,
     );
   }
 
@@ -64,6 +77,13 @@ class UserProgress {
         (key, value) => MapEntry(key, (value as num).toInt()),
       ),
       subscriptionActive: (json['subscription_active'] as bool?) ?? false,
+      savedWords: (json['saved_words'] as List<dynamic>? ?? const [])
+          .map((e) => e as String)
+          .toList(),
+      leitnerBoxes:
+          (json['leitner_boxes'] as Map<String, dynamic>? ?? const {}).map(
+        (key, value) => MapEntry(key, (value as num).toInt()),
+      ),
     );
   }
 
@@ -76,5 +96,7 @@ class UserProgress {
         'favorite_books': favoriteBooks,
         'book_progress': bookProgress,
         'subscription_active': subscriptionActive,
+        'saved_words': savedWords,
+        'leitner_boxes': leitnerBoxes,
       };
 }

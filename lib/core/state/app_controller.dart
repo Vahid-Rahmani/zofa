@@ -155,6 +155,63 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Bookmarks [word] so it appears in "My Words".
+  Future<void> saveWord(String word) async {
+    final user = _user;
+    if (user == null || _progressData.savedWords.contains(word)) return;
+    _progressData = _progressData.copyWith(
+      savedWords: [..._progressData.savedWords, word],
+    );
+    await _progress.saveProgress(user, _progressData);
+    notifyListeners();
+  }
+
+  /// Removes [word] from "My Words".
+  Future<void> removeSavedWord(String word) async {
+    final user = _user;
+    if (user == null) return;
+    _progressData = _progressData.copyWith(
+      savedWords:
+          _progressData.savedWords.where((w) => w != word).toList(),
+    );
+    await _progress.saveProgress(user, _progressData);
+    notifyListeners();
+  }
+
+  /// Puts [word] into the Leitner system at box 1 (reviewed daily).
+  Future<void> addToLeitner(String word) async {
+    final user = _user;
+    if (user == null || _progressData.leitnerBoxes.containsKey(word)) return;
+    _progressData = _progressData.copyWith(
+      leitnerBoxes: {..._progressData.leitnerBoxes, word: 1},
+    );
+    await _progress.saveProgress(user, _progressData);
+    notifyListeners();
+  }
+
+  /// Removes [word] from the Leitner system entirely.
+  Future<void> removeFromLeitner(String word) async {
+    final user = _user;
+    if (user == null) return;
+    final boxes = Map<String, int>.from(_progressData.leitnerBoxes)..remove(word);
+    _progressData = _progressData.copyWith(leitnerBoxes: boxes);
+    await _progress.saveProgress(user, _progressData);
+    notifyListeners();
+  }
+
+  /// Records a Leitner answer for [word]: `knew` promotes it to the next box
+  /// (capped at 5), otherwise it drops back to box 1.
+  Future<void> reviewLeitnerCard(String word, {required bool knew}) async {
+    final user = _user;
+    if (user == null) return;
+    final boxes = Map<String, int>.from(_progressData.leitnerBoxes);
+    final current = boxes[word] ?? 1;
+    boxes[word] = knew ? (current < 5 ? current + 1 : 5) : 1;
+    _progressData = _progressData.copyWith(leitnerBoxes: boxes);
+    await _progress.saveProgress(user, _progressData);
+    notifyListeners();
+  }
+
   /// Purchases [plan] through Stripe and unlocks premium access.
   Future<bool> purchase(SubscriptionPlan plan) async {
     final ok = await _guard(

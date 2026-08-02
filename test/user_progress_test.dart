@@ -13,6 +13,8 @@ void main() {
         favoriteBooks: ['book_little_light'],
         bookProgress: {'book_little_light': 2},
         subscriptionActive: true,
+        savedWords: ['apple', 'book'],
+        leitnerBoxes: {'apple': 1, 'book': 3},
       );
 
       final restored = UserProgress.fromJson(progress.toJson());
@@ -25,6 +27,8 @@ void main() {
       expect(restored.favoriteBooks, ['book_little_light']);
       expect(restored.bookProgress, {'book_little_light': 2});
       expect(restored.subscriptionActive, isTrue);
+      expect(restored.savedWords, ['apple', 'book']);
+      expect(restored.leitnerBoxes, {'apple': 1, 'book': 3});
     });
 
     test('copyWith keeps untouched fields', () {
@@ -33,6 +37,8 @@ void main() {
 
       expect(updated.xp, 10);
       expect(updated.wordsLearned, 3);
+      expect(updated.savedWords, isEmpty);
+      expect(updated.leitnerBoxes, isEmpty);
     });
   });
 }

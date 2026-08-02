@@ -1,12 +1,18 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../core/state/app_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../data/models/dictionary_entry.dart';
 import '../../data/services/dictionary.dart';
 import '../../data/services/dictionary_service.dart';
 
-/// The Dictionary tab: searchable English -> Persian dictionary with hundreds
-/// of entries, each carrying an example sentence and a proficiency level.
+/// The Dictionary tab: searchable English/German -> Persian dictionary backed
+/// by the indexed [DictionaryService]. Searches are debounced and paginated so
+/// the UI stays smooth even with hundreds of thousands of entries, and results
+/// scroll infinitely while filters (level, part of speech, topic) narrow them.
 class DictionaryScreen extends StatefulWidget {
   const DictionaryScreen({super.key});
 
@@ -15,35 +21,14 @@ class DictionaryScreen extends StatefulWidget {
 }
 
 class _DictionaryScreenState extends State<DictionaryScreen> {
-  final _searchController = TextEditingController();
-  String _query = '';
-
-  /// Selected CEFR level; `null` means all levels.
-  String? _level;
-
   /// Whether the German dictionary is shown instead of the English one.
   bool _isGerman = false;
 
   late final Future<DictionaryService> _english = Dictionary.service;
   late final Future<DictionaryService> _german = GermanDictionary.service;
 
-  List<DictionaryEntry> _resultsFor(DictionaryService dict) {
-    final base = _query.trim().isEmpty ? dict.all : dict.search(_query);
-    if (_level == null) return base;
-    return base.where((e) => e.level == _level).toList();
-  }
-
-  int _countFor(DictionaryService dict, String level) =>
-      dict.byLevel(level).length;
-
   String get _languageLabel =>
       _isGerman ? 'German → Persian' : 'English → Persian';
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,13 +41,156 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        return _buildBody(context, snapshot.data!);
+        return _DictionaryBody(
+          key: ValueKey(_isGerman),
+          dict: snapshot.data!,
+          languageLabel: _languageLabel,
+          isGerman: _isGerman,
+          onLanguageChanged: (value) => setState(() => _isGerman = value),
+        );
       },
     );
   }
+}
 
-  Widget _buildBody(BuildContext context, DictionaryService dict) {
-    final results = _resultsFor(dict);
+/// Stateful search/filter/pagination surface for one loaded dictionary.
+class _DictionaryBody extends StatefulWidget {
+  const _DictionaryBody({
+    super.key,
+    required this.dict,
+    required this.languageLabel,
+    required this.isGerman,
+    required this.onLanguageChanged,
+  });
+
+  final DictionaryService dict;
+  final String languageLabel;
+  final bool isGerman;
+  final ValueChanged<bool> onLanguageChanged;
+
+  @override
+  State<_DictionaryBody> createState() => _DictionaryBodyState();
+}
+
+class _DictionaryBodyState extends State<_DictionaryBody> {
+  static const int _pageSize = 40;
+
+  final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
+  Timer? _debounce;
+
+  String _query = '';
+
+  /// Selected CEFR level; `null` means all levels.
+  String? _level;
+
+  /// Selected part of speech; `null` means all.
+  String? _pos;
+
+  /// Selected topic / free-form tag; `null` means all.
+  String? _tag;
+
+  List<DictionaryEntry> _results = const [];
+  int _total = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+    final initial = widget.dict.searchPaged(_currentQuery(offset: 0));
+    _results = initial.items;
+    _total = initial.total;
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMore();
+    }
+  }
+
+  DictionaryQuery _currentQuery({required int offset}) => DictionaryQuery(
+        query: _query,
+        levels: _level == null ? const [] : [_level!],
+        partsOfSpeech: _pos == null ? const [] : [_pos!],
+        tags: _tag == null ? const [] : [_tag!],
+        offset: offset,
+        limit: _pageSize,
+      );
+
+  void _reload() {
+    final result = widget.dict.searchPaged(_currentQuery(offset: 0));
+    setState(() {
+      _results = result.items;
+      _total = result.total;
+    });
+  }
+
+  void _loadMore() {
+    if (_results.length >= _total) return;
+    final result = widget.dict.searchPaged(_currentQuery(offset: _results.length));
+    setState(() {
+      _results = [..._results, ...result.items];
+      _total = result.total;
+    });
+  }
+
+  void _onSearchChanged(String value) {
+    setState(() => _query = value);
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) _reload();
+    });
+  }
+
+  void _setLevel(String? level) {
+    _debounce?.cancel();
+    setState(() => _level = level);
+    _reload();
+  }
+
+  void _setPos(String? pos) {
+    _debounce?.cancel();
+    setState(() => _pos = pos);
+    _reload();
+  }
+
+  void _setTag(String? tag) {
+    _debounce?.cancel();
+    setState(() => _tag = tag);
+    _reload();
+  }
+
+  void _clearFilters() {
+    _debounce?.cancel();
+    _searchController.clear();
+    setState(() {
+      _query = '';
+      _level = null;
+      _pos = null;
+      _tag = null;
+    });
+    _reload();
+  }
+
+  bool get _hasActiveFilters =>
+      _level != null || _pos != null || _tag != null || _query.isNotEmpty;
+
+  bool get _hasMore => _results.length < _total;
+
+  @override
+  Widget build(BuildContext context) {
+    final dict = widget.dict;
+    final posOptions = _posOptions(dict);
+    final tagOptions = _tagOptions(dict);
 
     return Scaffold(
       body: SafeArea(
@@ -84,7 +212,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${dict.wordCount} words · $_languageLabel',
+                    '${dict.wordCount} words · ${widget.languageLabel}',
                     style: const TextStyle(color: ZovaColors.textSecondary),
                   ),
                   const SizedBox(height: 12),
@@ -101,9 +229,9 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                         icon: Icon(Icons.translate, size: 18),
                       ),
                     ],
-                    selected: {_isGerman},
+                    selected: {widget.isGerman},
                     onSelectionChanged: (selection) =>
-                        setState(() => _isGerman = selection.first),
+                        widget.onLanguageChanged(selection.first),
                     style: ButtonStyle(
                       visualDensity: VisualDensity.compact,
                       textStyle: WidgetStateProperty.all(
@@ -131,7 +259,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: TextField(
                 controller: _searchController,
-                onChanged: (value) => setState(() => _query = value),
+                onChanged: _onSearchChanged,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   hintText: 'Search a word or meaning…',
@@ -143,6 +271,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                           onPressed: () {
                             _searchController.clear();
                             setState(() => _query = '');
+                            _debounce?.cancel();
+                            _reload();
                           },
                         ),
                   filled: true,
@@ -155,7 +285,8 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Padding(
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
                 children: [
@@ -163,28 +294,45 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     label: 'All',
                     count: dict.wordCount,
                     selected: _level == null,
-                    onTap: () => setState(() => _level = null),
+                    onTap: () => _setLevel(null),
                   ),
-                  const SizedBox(width: 8),
-                  _LevelFilterChip(
-                    label: 'A1',
-                    count: _countFor(dict, 'A1'),
-                    selected: _level == 'A1',
-                    onTap: () => setState(() => _level = 'A1'),
+                  for (final level in kCefrLevels) ...[
+                    const SizedBox(width: 8),
+                    _LevelFilterChip(
+                      label: level,
+                      count: dict.countForLevel(level),
+                      selected: _level == level,
+                      onTap: () => _setLevel(level),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _FilterDropdown<String?>(
+                      label: 'Part of speech',
+                      icon: Icons.tag,
+                      value: _pos,
+                      options: posOptions,
+                      onChanged: (value) =>
+                          _setPos(value == _allSentinel ? null : value),
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  _LevelFilterChip(
-                    label: 'A2',
-                    count: _countFor(dict, 'A2'),
-                    selected: _level == 'A2',
-                    onTap: () => setState(() => _level = 'A2'),
-                  ),
-                  const SizedBox(width: 8),
-                  _LevelFilterChip(
-                    label: 'B1',
-                    count: _countFor(dict, 'B1'),
-                    selected: _level == 'B1',
-                    onTap: () => setState(() => _level = 'B1'),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _FilterDropdown<String?>(
+                      label: 'Topic',
+                      icon: Icons.topic_outlined,
+                      value: _tag,
+                      options: tagOptions,
+                      onChanged: (value) =>
+                          _setTag(value == _allSentinel ? null : value),
+                    ),
                   ),
                 ],
               ),
@@ -192,18 +340,31 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                '${results.length} result${results.length == 1 ? '' : 's'}',
-                style: const TextStyle(
-                  color: ZovaColors.textSecondary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
+              child: Row(
+                children: [
+                  Text(
+                    '$_total result${_total == 1 ? '' : 's'}',                    style: const TextStyle(
+                      color: ZovaColors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (_hasActiveFilters)
+                    TextButton(
+                      onPressed: _clearFilters,
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: ZovaColors.primary,
+                      ),
+                      child: const Text('Clear filters'),
+                    ),
+                ],
               ),
             ),
             const SizedBox(height: 4),
             Expanded(
-              child: results.isEmpty
+              child: _results.isEmpty
                   ? const Center(
                       child: Text(
                         'No words match your search.',
@@ -211,11 +372,24 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       ),
                     )
                   : ListView.separated(
+                      controller: _scrollController,
                       padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                      itemCount: results.length,
+                      itemCount: _results.length + (_hasMore ? 1 : 0),
                       separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (context, index) {
-                        final entry = results[index];
+                        if (index >= _results.length) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Center(
+                              child: SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(strokeWidth: 2.5),
+                              ),
+                            ),
+                          );
+                        }
+                        final entry = _results[index];
                         return _EntryCard(
                           entry: entry,
                           onTap: () {
@@ -230,6 +404,97 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  static const String _allSentinel = '__all__';
+
+  /// All parts of speech as `label: key` dropdown options, sorted by count.
+  List<(String, String)> _posOptions(DictionaryService dict) {
+    final keys = dict.posKeys.toList()..sort();
+    return [
+      ('All', _allSentinel),
+      for (final key in keys) ('$key (${dict.countForPos(key)})', key),
+    ];
+  }
+
+  /// Up to 20 most common topic/tag options, sorted by count.
+  List<(String, String)> _tagOptions(DictionaryService dict) {
+    final ranked = dict.tagKeys.toList()
+      ..sort((a, b) {
+        final byCount = dict.countForTag(b).compareTo(dict.countForTag(a));
+        return byCount != 0 ? byCount : a.compareTo(b);
+      });
+    return [
+      ('All', _allSentinel),
+      for (final key in ranked.take(20)) ('$key (${dict.countForTag(key)})', key),
+    ];
+  }
+}
+
+/// Standalone drop-down row used for the part-of-speech and topic filters.
+class _FilterDropdown<T> extends StatelessWidget {
+  const _FilterDropdown({
+    required this.label,
+    required this.icon,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+  final String label;
+  final IconData icon;
+  final T value;
+
+  /// `(label, key)` pairs; the key is what [onChanged] receives.
+  final List<(String, String)> options;
+  final ValueChanged<T?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    var selectedLabel = label;
+    for (final (labelText, key) in options) {
+      if (key == value) {
+        selectedLabel = labelText;
+        break;
+      }
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: ZovaColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: ZovaColors.textSecondary.withValues(alpha: 0.15)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          isExpanded: true,
+          value: value,
+          icon: const Icon(Icons.arrow_drop_down),
+          hint: Row(
+            children: [
+              Icon(icon, size: 16, color: ZovaColors.textSecondary),
+              const SizedBox(width: 6),
+              Text(
+                selectedLabel,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: ZovaColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          items: [
+            for (final (labelText, key) in options)
+              DropdownMenuItem<T>(
+                value: key as T,
+                child: Text(labelText, overflow: TextOverflow.ellipsis),
+              ),
+          ],
+          onChanged: onChanged,
         ),
       ),
     );
@@ -255,6 +520,9 @@ class _LevelFilterChip extends StatelessWidget {
       'A1' => ZovaColors.success,
       'A2' => ZovaColors.primary,
       'B1' => ZovaColors.warning,
+      'B2' => ZovaColors.info,
+      'C1' => ZovaColors.secondary,
+      'C2' => ZovaColors.error,
       _ => ZovaColors.textSecondary,
     };
     return GestureDetector(
@@ -377,6 +645,10 @@ class _LevelChip extends StatelessWidget {
     final color = switch (level) {
       'A1' => ZovaColors.success,
       'A2' => ZovaColors.primary,
+      'B1' => ZovaColors.warning,
+      'B2' => ZovaColors.info,
+      'C1' => ZovaColors.secondary,
+      'C2' => ZovaColors.error,
       _ => ZovaColors.warning,
     };
     return Container(
@@ -405,6 +677,10 @@ class EntryDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final controller = context.watch<AppController>();
+    final isSaved = controller.progress.savedWords.contains(entry.word);
+    final inLeitner = controller.progress.leitnerBoxes.containsKey(entry.word);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(entry.word, style: const TextStyle(fontSize: 18)),
@@ -472,6 +748,63 @@ class EntryDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 50),
+                      foregroundColor: isSaved
+                          ? ZovaColors.success
+                          : ZovaColors.textPrimary,
+                    ),
+                    onPressed: () {
+                      if (isSaved) {
+                        controller.removeSavedWord(entry.word);
+                      } else {
+                        controller.saveWord(entry.word);
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            isSaved
+                                ? 'Removed from My Words'
+                                : 'Saved to My Words',
+                          ),
+                        ),
+                      );
+                    },
+                    icon: Icon(
+                      isSaved ? Icons.bookmark : Icons.bookmark_outline,
+                      size: 20,
+                    ),
+                    label: Text(isSaved ? 'Saved' : 'Save'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 50),
+                      foregroundColor: ZovaColors.primary,
+                    ),
+                    onPressed: inLeitner
+                        ? null
+                        : () {
+                            controller.addToLeitner(entry.word);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Added to Leitner Box'),
+                              ),
+                            );
+                          },
+                    icon: const Icon(Icons.style_outlined, size: 20),
+                    label: Text(inLeitner ? 'In Leitner' : 'Leitner'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
             const Text(
               'Example',
               style: TextStyle(
@@ -510,7 +843,7 @@ class EntryDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'This word appears in the A1-A2-B1 course lessons, so you can '
+              'This word appears in the A1-B2 course lessons, so you can '
               'practice it with flashcards, matching games and quizzes.',
               style: TextStyle(
                 fontSize: 14,

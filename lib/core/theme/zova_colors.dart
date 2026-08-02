@@ -19,6 +19,7 @@ abstract final class ZovaColors {
   static const Color success = Color(0xFF2FBF71);
   static const Color warning = Color(0xFFFFC24B);
   static const Color error = Color(0xFFFF5C6C);
+  static const Color info = Color(0xFF9B7BFF);
   static const Color gold = Color(0xFFFFC24B);
 
   static const Color gradientStart = Color(0xFF3D7BFF);
