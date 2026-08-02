@@ -60,7 +60,12 @@ class _SessionGateState extends State<SessionGate> {
       (false, _) => OnboardingScreen(
           onFinished: (prefs) async {
             final controller = context.read<AppController>();
+            final language = context.read<LanguageController>();
             controller.setOnboardingPrefs(prefs);
+            await language.setLanguagePair(
+              native: prefs.nativeLanguageCode,
+              learning: prefs.learningLanguageCode,
+            );
             await controller.markOnboarded();
           },
         ),

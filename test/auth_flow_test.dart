@@ -39,13 +39,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Walk through the three intro pages.
-    for (var i = 0; i < 3; i++) {
-      await tester.tap(find.text('Continue'));
-      await tester.pumpAndSettle();
-    }
+    // Initial language onboarding: native + learning languages.
+    expect(find.text('What’s your native language?'), findsOneWidget);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
 
-    // Final prefs page -> start learning.
+    expect(find.text('What do you want to learn?'), findsOneWidget);
     await tester.tap(find.text('Start learning'));
     await tester.pumpAndSettle();
 

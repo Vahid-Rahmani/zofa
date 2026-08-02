@@ -45,11 +45,12 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   @override
   void initState() {
     super.initState();
-    final preferred =
-        context.read<LanguageController>().settings.translationLanguage;
-    _source = _english;
-    _target = TranslationLanguage.byCode(preferred.code) ?? _persian;
-    if (_target == _source) _target = _persian;
+    final settings = context.read<LanguageController>().settings;
+    final native = TranslationLanguage.byCode(settings.nativeLanguage);
+    final learning = TranslationLanguage.byCode(settings.learningLanguage);
+    _source = learning ?? _english;
+    _target = native ?? _persian;
+    if (_target == _source) _target = _otherOf(_source);
   }
 
   @override
@@ -61,9 +62,52 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
 
   void _onSearchChanged(String value) {
     setState(() => _query = value);
+    _maybeSmartFlip(value);
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), _runLookup);
   }
+
+  /// Whether the current From/To pair is the saved native ↔ learning pair in
+  /// either direction. Smart auto-direction only applies to this pair so a
+  /// manual override to an arbitrary pair is never overridden.
+  bool get _onSavedPair {
+    final settings = context.read<LanguageController>().settings;
+    final native = TranslationLanguage.byCode(settings.nativeLanguage);
+    final learning = TranslationLanguage.byCode(settings.learningLanguage);
+    return (_source == learning && _target == native) ||
+        (_source == native && _target == learning);
+  }
+
+  /// Bidirectional smart lookup: when the saved native ↔ learning pair has
+  /// different text directions, typing in the RTL language translates from
+  /// native to learning and typing in the LTR language translates from
+  /// learning to native. The pickers follow along so the user always sees the
+  /// active direction. Pairs with the same direction (and any manual override
+  /// to an arbitrary pair) keep the selected direction as-is.
+  void _maybeSmartFlip(String query) {
+    if (query.isEmpty || !_onSavedPair) return;
+    final settings = context.read<LanguageController>().settings;
+    final native = TranslationLanguage.byCode(settings.nativeLanguage);
+    final learning = TranslationLanguage.byCode(settings.learningLanguage);
+    if (native == null || learning == null) return;
+    if (native.isRtl == learning.isRtl) return;
+
+    final desiredSource =
+        _isRtlText(query) == native.isRtl ? native : learning;
+    if (desiredSource != _source) {
+      setState(() {
+        _source = desiredSource;
+        _target = desiredSource == native ? learning : native;
+      });
+    }
+  }
+
+  /// Detects RTL scripts (Persian, Arabic, Hebrew, …) in [text].
+  bool _isRtlText(String text) =>
+      _rtlScriptPattern.hasMatch(text);
+
+  static final RegExp _rtlScriptPattern =
+      RegExp(r'[\u0591-\u08FF\uFB1D-\uFDFD\uFE70-\uFEFC]');
 
   void _clearSearch() {
     _debounce?.cancel();

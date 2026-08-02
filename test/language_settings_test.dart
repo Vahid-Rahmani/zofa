@@ -21,34 +21,47 @@ void main() {
   });
 
   group('LanguageSettings', () {
-    test('defaults to an English UI with Persian explanations', () {
+    test('defaults to a Persian speaker learning English', () {
       const settings = LanguageSettings();
-      expect(settings.uiLanguage, AppLanguage.english);
+      expect(settings.nativeLanguage, 'fa');
+      expect(settings.learningLanguage, 'en');
+      expect(settings.uiLanguage, AppLanguage.persian);
       expect(settings.translationLanguage, AppLanguage.persian);
-      expect(settings.isRtlUi, isFalse);
-    });
-
-    test('Persian UI flips directionality', () {
-      const settings =
-          LanguageSettings(uiLanguage: AppLanguage.persian);
       expect(settings.isRtlUi, isTrue);
     });
 
+    test('an English native flips the UI to LTR', () {
+      const settings =
+          LanguageSettings(nativeLanguage: 'en', learningLanguage: 'de');
+      expect(settings.uiLanguage, AppLanguage.english);
+      expect(settings.translationLanguage, AppLanguage.english);
+      expect(settings.isRtlUi, isFalse);
+    });
+
     test('round-trips through JSON', () {
-      const settings = LanguageSettings(
-        uiLanguage: AppLanguage.persian,
-        translationLanguage: AppLanguage.english,
-      );
+      const settings =
+          LanguageSettings(nativeLanguage: 'de', learningLanguage: 'fa');
       final restored = LanguageSettings.fromJson(settings.toJson());
-      expect(restored.uiLanguage, AppLanguage.persian);
-      expect(restored.translationLanguage, AppLanguage.english);
+      expect(restored.nativeLanguage, 'de');
+      expect(restored.learningLanguage, 'fa');
+      expect(restored.isRtlUi, isFalse);
+    });
+
+    test('migrates the legacy ui/translation schema', () {
+      final restored = LanguageSettings.fromJson({
+        'ui_language': 'en',
+        'translation_language': 'fa',
+      });
+      expect(restored.nativeLanguage, 'fa');
+      expect(restored.learningLanguage, 'en');
+      expect(restored.isRtlUi, isTrue);
     });
 
     test('copyWith only overrides the given fields', () {
       const settings = LanguageSettings();
-      final next = settings.copyWith(uiLanguage: AppLanguage.persian);
-      expect(next.uiLanguage, AppLanguage.persian);
-      expect(next.translationLanguage, AppLanguage.persian);
+      final next = settings.copyWith(nativeLanguage: 'en');
+      expect(next.nativeLanguage, 'en');
+      expect(next.learningLanguage, 'en');
     });
   });
 
@@ -56,35 +69,59 @@ void main() {
     test('bootstrap loads persisted preferences', () async {
       SharedPreferences.setMockInitialValues({
         'zova.language':
-            '{"ui_language":"fa","translation_language":"en"}',
+            '{"native_language":"de","learning_language":"fa"}',
       });
       final controller = LanguageController();
       await controller.bootstrap();
-      expect(controller.settings.uiLanguage, AppLanguage.persian);
-      expect(controller.settings.translationLanguage, AppLanguage.english);
+      expect(controller.settings.nativeLanguage, 'de');
+      expect(controller.settings.learningLanguage, 'fa');
+      expect(controller.isRtlUi, isFalse);
+    });
+
+    test('bootstrap migrates legacy persisted preferences', () async {
+      SharedPreferences.setMockInitialValues({
+        'zova.language':
+            '{"ui_language":"en","translation_language":"fa"}',
+      });
+      final controller = LanguageController();
+      await controller.bootstrap();
+      expect(controller.settings.nativeLanguage, 'fa');
+      expect(controller.settings.learningLanguage, 'en');
       expect(controller.isRtlUi, isTrue);
     });
 
-    test('setUiLanguage persists and flips directionality', () async {
+    test('setNativeLanguage persists and flips directionality', () async {
       SharedPreferences.setMockInitialValues({});
       final controller = LanguageController();
       await controller.bootstrap();
-      expect(controller.isRtlUi, isFalse);
-
-      await controller.setUiLanguage(AppLanguage.persian);
       expect(controller.isRtlUi, isTrue);
-      expect((await LocalStore.getLanguageSettings()).uiLanguage,
-          AppLanguage.persian);
 
-      await controller.setTranslationLanguage(AppLanguage.english);
-      expect(controller.settings.translationLanguage, AppLanguage.english);
-      expect((await LocalStore.getLanguageSettings()).translationLanguage,
-          AppLanguage.english);
+      await controller.setNativeLanguage('en');
+      expect(controller.isRtlUi, isFalse);
+      expect((await LocalStore.getLanguageSettings()).nativeLanguage, 'en');
+
+      await controller.setLearningLanguage('de');
+      expect(controller.settings.learningLanguage, 'de');
+      expect((await LocalStore.getLanguageSettings()).learningLanguage, 'de');
+    });
+
+    test('setLanguagePair stores both sides at once', () async {
+      SharedPreferences.setMockInitialValues({});
+      final controller = LanguageController();
+      await controller.bootstrap();
+
+      await controller.setLanguagePair(native: 'de', learning: 'es');
+      expect(controller.settings.nativeLanguage, 'de');
+      expect(controller.settings.learningLanguage, 'es');
+      final stored = await LocalStore.getLanguageSettings();
+      expect(stored.nativeLanguage, 'de');
+      expect(stored.learningLanguage, 'es');
     });
   });
 
   group('LanguageSettingsScreen', () {
-    testWidgets('selecting a language updates the controller', (tester) async {
+    testWidgets('changing the native language updates the controller',
+        (tester) async {
       SharedPreferences.setMockInitialValues({});
       final controller = LanguageController();
       await controller.bootstrap();
@@ -97,15 +134,18 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Interface language'), findsOneWidget);
-      expect(find.text('Translations & explanations'), findsOneWidget);
+      expect(find.text('Native language'), findsOneWidget);
+      expect(find.text('Learning language'), findsOneWidget);
       expect(find.text('فارسی'), findsWidgets);
 
-      await tester.tap(find.text('فارسی').first);
+      await tester.ensureVisible(find.text('English').first);
+      await tester.tap(find.text('English').first);
       await tester.pumpAndSettle();
 
-      expect(controller.settings.uiLanguage, AppLanguage.persian);
-      expect(controller.isRtlUi, isTrue);
+      expect(controller.settings.nativeLanguage, 'en');
+      expect(controller.isRtlUi, isFalse);
+      // The learning side is bumped away so the pair stays distinct.
+      expect(controller.settings.learningLanguage, isNot('en'));
     });
   });
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/state/app_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../core/widgets/gradient_button.dart';
+import '../../data/models/translation_language.dart';
 
 /// One full-screen page inside the onboarding flow.
 class OnboardingPage {
@@ -17,7 +18,10 @@ class OnboardingPage {
   final String subtitle;
 }
 
-/// Collects the user's preferences before the first lesson.
+/// Collects the language pair (native + learning) before the first lesson.
+///
+/// The chosen pair is persisted through [LanguageController] and drives the
+/// app's interface language, text direction and dictionary defaults.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key, required this.onFinished});
 
@@ -31,28 +35,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _controller = PageController();
   int _page = 0;
 
-  String _nativeLanguage = 'Persian';
-  String _level = 'beginner';
-  String _motivation = 'travel';
+  static final TranslationLanguage _defaultNative =
+      TranslationLanguage.byCode('fa')!;
+  static final TranslationLanguage _defaultLearning =
+      kTranslationLanguages.firstWhere((l) => l != _defaultNative);
+
+  TranslationLanguage _native = _defaultNative;
+  TranslationLanguage _learning = _defaultLearning;
 
   static const _pages = [
     OnboardingPage(
       emoji: '🌍',
-      title: 'Learn a language you love',
+      title: 'What’s your native language?',
       subtitle:
-          'zova turns everyday learning into a habit with lessons, stories and games.',
+          'The language you already speak. zova uses it for the interface '
+          'and for word explanations.',
     ),
     OnboardingPage(
-      emoji: '📖',
-      title: 'Read real stories',
+      emoji: '🎯',
+      title: 'What do you want to learn?',
       subtitle:
-          'Tap any word in a story to see its meaning. Your vocabulary grows as you read.',
-    ),
-    OnboardingPage(
-      emoji: '🚀',
-      title: 'Stay motivated',
-      subtitle:
-          'Daily streaks, experience points and a clear roadmap keep you moving forward.',
+          'Pick the language you want to master next. You can change it '
+          'anytime in Settings.',
     ),
   ];
 
@@ -71,19 +75,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             Expanded(
               child: PageView.builder(
                 controller: _controller,
-                itemCount: _pages.length + 1,
+                itemCount: _pages.length,
                 onPageChanged: (index) => setState(() => _page = index),
                 itemBuilder: (context, index) {
-                  if (index < _pages.length) {
-                    return _IntroPage(page: _pages[index]);
+                  if (index == 0) {
+                    return _LanguagePickerPage(
+                      page: _pages[0],
+                      languages: kTranslationLanguages,
+                      selected: _native,
+                      onSelected: _selectNative,
+                    );
                   }
-                  return _PrefsPage(
-                    nativeLanguage: _nativeLanguage,
-                    level: _level,
-                    motivation: _motivation,
-                    onNativeChanged: (v) => setState(() => _nativeLanguage = v),
-                    onLevelChanged: (v) => setState(() => _level = v),
-                    onMotivationChanged: (v) => setState(() => _motivation = v),
+                  return _LanguagePickerPage(
+                    page: _pages[1],
+                    languages: [
+                      for (final language in kTranslationLanguages)
+                        if (language != _native) language,
+                    ],
+                    selected: _learning,
+                    onSelected: (language) =>
+                        setState(() => _learning = language),
                   );
                 },
               ),
@@ -99,8 +110,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
+  void _selectNative(TranslationLanguage language) {
+    setState(() {
+      _native = language;
+      if (_learning == language) {
+        _learning = kTranslationLanguages.firstWhere((l) => l != language);
+      }
+    });
+  }
+
   void _next() {
-    if (_page < _pages.length) {
+    if (_page < _pages.length - 1) {
       _controller.nextPage(
         duration: const Duration(milliseconds: 320),
         curve: Curves.easeOut,
@@ -108,117 +128,67 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     } else {
       widget.onFinished(
         OnboardingPrefs(
-          nativeLanguage: _nativeLanguage,
-          level: _level,
-          motivation: _motivation,
+          nativeLanguageCode: _native.code,
+          learningLanguageCode: _learning.code,
         ),
       );
     }
   }
 }
 
-class _IntroPage extends StatelessWidget {
-  const _IntroPage({required this.page});
-
-  final OnboardingPage page;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(page.emoji, style: const TextStyle(fontSize: 96)),
-          const SizedBox(height: 32),
-          Text(
-            page.title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: ZovaColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            page.subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 16,
-              height: 1.5,
-              color: ZovaColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PrefsPage extends StatelessWidget {
-  const _PrefsPage({
-    required this.nativeLanguage,
-    required this.level,
-    required this.motivation,
-    required this.onNativeChanged,
-    required this.onLevelChanged,
-    required this.onMotivationChanged,
+class _LanguagePickerPage extends StatelessWidget {
+  const _LanguagePickerPage({
+    required this.page,
+    required this.languages,
+    required this.selected,
+    required this.onSelected,
   });
 
-  final String nativeLanguage;
-  final String level;
-  final String motivation;
-  final ValueChanged<String> onNativeChanged;
-  final ValueChanged<String> onLevelChanged;
-  final ValueChanged<String> onMotivationChanged;
+  final OnboardingPage page;
+  final List<TranslationLanguage> languages;
+  final TranslationLanguage selected;
+  final ValueChanged<TranslationLanguage> onSelected;
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 48),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'A few questions',
-            style: TextStyle(
-              fontSize: 28,
+          Center(child: Text(page.emoji, style: const TextStyle(fontSize: 72))),
+          const SizedBox(height: 24),
+          Text(
+            page.title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 26,
               fontWeight: FontWeight.w800,
               color: ZovaColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'We will tailor your roadmap.',
-            style: TextStyle(color: ZovaColors.textSecondary),
+          const SizedBox(height: 10),
+          Text(
+            page.subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 15,
+              height: 1.5,
+              color: ZovaColors.textSecondary,
+            ),
           ),
-          const SizedBox(height: 32),
-          _PrefsBlock(
-            title: 'Your language',
-            options: const [
-              'Persian',
-              'German',
-              'French',
-              'Spanish',
-              'Portuguese',
+          const SizedBox(height: 28),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final language in languages)
+                _LanguageChip(
+                  language: language,
+                  selected: language == selected,
+                  onTap: () => onSelected(language),
+                ),
             ],
-            selected: nativeLanguage,
-            onChanged: onNativeChanged,
-          ),
-          const SizedBox(height: 28),
-          _PrefsBlock(
-            title: 'Your level',
-            options: const ['beginner', 'intermediate', 'advanced'],
-            selected: level,
-            onChanged: onLevelChanged,
-          ),
-          const SizedBox(height: 28),
-          _PrefsBlock(
-            title: 'Main goal',
-            options: const ['travel', 'work', 'study', 'fun'],
-            selected: motivation,
-            onChanged: onMotivationChanged,
           ),
           const SizedBox(height: 16),
         ],
@@ -227,54 +197,62 @@ class _PrefsPage extends StatelessWidget {
   }
 }
 
-class _PrefsBlock extends StatelessWidget {
-  const _PrefsBlock({
-    required this.title,
-    required this.options,
+class _LanguageChip extends StatelessWidget {
+  const _LanguageChip({
+    required this.language,
     required this.selected,
-    required this.onChanged,
+    required this.onTap,
   });
 
-  final String title;
-  final List<String> options;
-  final String selected;
-  final ValueChanged<String> onChanged;
+  final TranslationLanguage language;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: ZovaColors.textSecondary,
+    return Material(
+      color: selected ? ZovaColors.primary : ZovaColors.surface,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: selected
+                  ? ZovaColors.primary
+                  : ZovaColors.textSecondary.withValues(alpha: 0.15),
+            ),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                language.nativeName,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: selected ? Colors.white : ZovaColors.textPrimary,
+                ),
+              ),
+              if (language.nativeName != language.name) ...[
+                const SizedBox(height: 2),
+                Text(
+                  language.name,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: selected
+                        ? Colors.white.withValues(alpha: 0.85)
+                        : ZovaColors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: options.map((option) {
-            final isSelected = option == selected;
-            return ChoiceChip(
-              label: Text(option),
-              selected: isSelected,
-              onSelected: (_) => onChanged(option),
-              selectedColor: ZovaColors.primary,
-              labelStyle: TextStyle(
-                color: isSelected
-                    ? Colors.white
-                    : ZovaColors.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-              backgroundColor: ZovaColors.surface,
-            );
-          }).toList(),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -292,7 +270,7 @@ class _BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLast = index >= total;
+    final isLast = index >= total - 1;
     return Padding(
       padding: const EdgeInsets.fromLTRB(28, 8, 28, 28),
       child: Column(
@@ -301,7 +279,7 @@ class _BottomBar extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(
-              total + 1,
+              total,
               (i) => AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
                 margin: const EdgeInsets.symmetric(horizontal: 4),

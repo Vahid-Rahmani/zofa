@@ -30,7 +30,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Learn a language you love'), findsOneWidget);
+    expect(find.text('What’s your native language?'), findsOneWidget);
     expect(find.text('Continue'), findsOneWidget);
   });
 }

@@ -1,9 +1,7 @@
-/// Languages the app's UI and explanations can be switched to.
+/// Languages the app's UI can be rendered in.
 ///
-/// The app teaches via a 3-way bridge (target language <-> English <->
-/// Persian). These two languages cover both sides of the explanation bridge:
-/// the UI/interface language and the preferred translation/explanation
-/// language can each be set to English or Persian independently.
+/// The app ships a Persian and an English interface. Every other native
+/// language falls back to the English UI.
 enum AppLanguage {
   english('en', 'English'),
   persian('fa', 'فارسی');
@@ -20,44 +18,69 @@ enum AppLanguage {
       code == 'fa' ? AppLanguage.persian : AppLanguage.english;
 }
 
-/// User language preferences: which language the interface is shown in and
-/// which language dictionary translations/explanations are rendered in.
+/// User language preferences: the learner's native language and the language
+/// they are learning. Both are ISO 639-1 codes and together define the
+/// app-wide language behaviour:
+///
+/// * the interface language and text direction derive from [nativeLanguage]
+///   (Persian flips the UI to RTL, everything else stays LTR English);
+/// * dictionary/explanation defaults point at the native ↔ learning pair.
 class LanguageSettings {
   const LanguageSettings({
-    this.uiLanguage = AppLanguage.english,
-    this.translationLanguage = AppLanguage.persian,
+    this.nativeLanguage = 'fa',
+    this.learningLanguage = 'en',
   });
 
-  /// Interface / app language.
-  final AppLanguage uiLanguage;
+  /// ISO 639-1 code of the learner's native language (e.g. `fa`, `en`).
+  final String nativeLanguage;
 
-  /// Preferred translation & explanation language (the "base explanation
-  /// language" the learner reads meanings in).
-  final AppLanguage translationLanguage;
+  /// ISO 639-1 code of the language being learned (e.g. `de`, `en`).
+  final String learningLanguage;
 
-  /// Whether the UI should render right-to-left (Persian).
+  /// Interface language, derived from [nativeLanguage]: Persian when the
+  /// native language is Persian, English otherwise.
+  AppLanguage get uiLanguage => AppLanguage.fromCode(nativeLanguage);
+
+  /// Preferred translation/explanation language: the learner reads meanings
+  /// in their native language.
+  AppLanguage get translationLanguage => AppLanguage.fromCode(nativeLanguage);
+
+  /// Whether the UI should render right-to-left (Persian interface).
   bool get isRtlUi => uiLanguage == AppLanguage.persian;
 
   LanguageSettings copyWith({
-    AppLanguage? uiLanguage,
-    AppLanguage? translationLanguage,
+    String? nativeLanguage,
+    String? learningLanguage,
   }) {
     return LanguageSettings(
-      uiLanguage: uiLanguage ?? this.uiLanguage,
-      translationLanguage: translationLanguage ?? this.translationLanguage,
+      nativeLanguage: nativeLanguage ?? this.nativeLanguage,
+      learningLanguage: learningLanguage ?? this.learningLanguage,
     );
   }
 
   factory LanguageSettings.fromJson(Map<String, dynamic> json) {
+    final native = json['native_language'] as String?;
+    final learning = json['learning_language'] as String?;
+    if (native != null && learning != null) {
+      return LanguageSettings(
+        nativeLanguage: native,
+        learningLanguage: learning,
+      );
+    }
+    // Legacy schema: the old explanation language is the learner's native
+    // language, and the old interface language is what they were learning.
+    final ui = AppLanguage.fromCode(json['ui_language'] as String?);
+    final explanation =
+        AppLanguage.fromCode(json['translation_language'] as String?);
     return LanguageSettings(
-      uiLanguage: AppLanguage.fromCode(json['ui_language'] as String?),
-      translationLanguage:
-          AppLanguage.fromCode(json['translation_language'] as String?),
+      nativeLanguage:
+          explanation == AppLanguage.persian ? 'fa' : 'en',
+      learningLanguage: ui == AppLanguage.persian ? 'fa' : 'en',
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'ui_language': uiLanguage.code,
-        'translation_language': translationLanguage.code,
+        'native_language': nativeLanguage,
+        'learning_language': learningLanguage,
       };
 }

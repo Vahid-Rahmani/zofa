@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../data/models/app_user.dart';
 import '../../data/models/learning_state.dart';
+import '../../data/models/translation_language.dart';
 import '../../data/models/subscription_plan.dart';
 import '../../data/models/user_progress.dart';
 import '../../data/repositories/auth_repository.dart';
@@ -12,17 +13,18 @@ import '../../data/services/spaced_repetition.dart';
 import '../../data/services/stripe_service.dart';
 import 'language_controller.dart';
 
-/// Preferences gathered during onboarding.
+/// Preferences gathered during the initial language onboarding.
 class OnboardingPrefs {
   const OnboardingPrefs({
-    this.nativeLanguage = 'Persian',
-    this.level = 'beginner',
-    this.motivation = 'travel',
+    this.nativeLanguageCode = 'fa',
+    this.learningLanguageCode = 'en',
   });
 
-  final String nativeLanguage;
-  final String level;
-  final String motivation;
+  /// ISO 639-1 code of the learner's native language.
+  final String nativeLanguageCode;
+
+  /// ISO 639-1 code of the language being learned.
+  final String learningLanguageCode;
 }
 
 /// Central application state for the signed-in user and their progress.
@@ -106,9 +108,11 @@ class AppController extends ChangeNotifier {
       final prefs = _prefs;
       final user = _user;
       if (user != null) {
+        final native = TranslationLanguage.byCode(prefs.nativeLanguageCode);
+        final learning = TranslationLanguage.byCode(prefs.learningLanguageCode);
         _user = user.copyWith(
-          nativeLanguage: prefs.nativeLanguage,
-          level: prefs.level,
+          nativeLanguage: native?.name ?? 'Persian',
+          learnedLanguage: learning?.name ?? 'English',
         );
         await _auth.updateProfile(_user!);
       }

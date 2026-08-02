@@ -185,4 +185,30 @@ void main() {
     expect(find.text('hi'), findsOneWidget);
     expect(find.text('سلام'), findsNothing);
   });
+
+  testWidgets('smart lookup flips direction based on the typed script',
+      (tester) async {
+    backend.results['en|fa|hello'] = helloFa;
+    backend.results['fa|en|سلام'] = const TranslationResult(
+      word: 'سلام',
+      source: 'fa',
+      target: 'en',
+      translation: 'hello',
+    );
+    await pumpScreen(tester);
+
+    // LTR text -> learning (English) -> native (Persian).
+    await search(tester, 'hello');
+    expect(find.text('سلام'), findsOneWidget);
+
+    // RTL text -> native (Persian) -> learning (English).
+    await tester.enterText(find.byType(TextField), 'سلام');
+    await tester.pump(const Duration(milliseconds: 450));
+    await tester.pumpAndSettle();
+
+    expect(find.text('hello'), findsOneWidget);
+    // The pickers followed the smart flip: From فارسی, To English.
+    expect(find.text('فارسی (fa)'), findsOneWidget);
+    expect(find.text('English (en)'), findsOneWidget);
+  });
 }

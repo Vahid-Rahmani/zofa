@@ -3,14 +3,15 @@ import 'package:provider/provider.dart';
 
 import '../../core/state/language_controller.dart';
 import '../../core/theme/zova_colors.dart';
-import '../../data/models/language_settings.dart';
+import '../../data/models/translation_language.dart';
 import '../../data/services/translation_service.dart';
 
-/// Lets the learner set, independently, the interface language and the
-/// preferred translation/explanation language (both English or Persian).
+/// Lets the learner set their language pair: the native language (which also
+/// drives the interface language, text direction and word explanations) and
+/// the language they are learning.
 ///
-/// Both choices are persisted by [LanguageController]; the interface language
-/// also flips the app's locale and text direction immediately.
+/// Both choices are persisted by [LanguageController]; changing the native
+/// language flips the app's locale and text direction immediately.
 class LanguageSettingsScreen extends StatelessWidget {
   const LanguageSettingsScreen({super.key});
 
@@ -18,6 +19,8 @@ class LanguageSettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = context.watch<LanguageController>();
     final settings = controller.settings;
+    final native = TranslationLanguage.byCode(settings.nativeLanguage);
+    final learning = TranslationLanguage.byCode(settings.learningLanguage);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Language')),
@@ -26,7 +29,7 @@ class LanguageSettingsScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
           children: [
             const Text(
-              'Interface language',
+              'Native language',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
@@ -35,26 +38,19 @@ class LanguageSettingsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             const Text(
-              'The language of buttons, labels and navigation.',
+              'The language you already speak. zova uses it for the '
+              'interface, text direction and word explanations.',
               style: TextStyle(color: ZovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 12),
-            _LanguageTile(
-              label: AppLanguage.english.label,
-              code: AppLanguage.english.code,
-              selected: settings.uiLanguage == AppLanguage.english,
-              onTap: () => controller.setUiLanguage(AppLanguage.english),
-            ),
-            const SizedBox(height: 10),
-            _LanguageTile(
-              label: AppLanguage.persian.label,
-              code: AppLanguage.persian.code,
-              selected: settings.uiLanguage == AppLanguage.persian,
-              onTap: () => controller.setUiLanguage(AppLanguage.persian),
+            _LanguageGrid(
+              languages: kTranslationLanguages,
+              selected: native,
+              onTap: (language) => _selectNative(controller, language),
             ),
             const SizedBox(height: 28),
             const Text(
-              'Translations & explanations',
+              'Learning language',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
@@ -63,23 +59,18 @@ class LanguageSettingsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             const Text(
-              'The language word meanings, definitions and examples are '
-              'shown in across the dictionary and reviews.',
+              'The language you are learning. Dictionary lookups default to '
+              'translating between this and your native language.',
               style: TextStyle(color: ZovaColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 12),
-            _LanguageTile(
-              label: AppLanguage.persian.label,
-              code: AppLanguage.persian.code,
-              selected: settings.translationLanguage == AppLanguage.persian,
-              onTap: () => controller.setTranslationLanguage(AppLanguage.persian),
-            ),
-            const SizedBox(height: 10),
-            _LanguageTile(
-              label: AppLanguage.english.label,
-              code: AppLanguage.english.code,
-              selected: settings.translationLanguage == AppLanguage.english,
-              onTap: () => controller.setTranslationLanguage(AppLanguage.english),
+            _LanguageGrid(
+              languages: [
+                for (final language in kTranslationLanguages)
+                  if (language != native) language,
+              ],
+              selected: learning,
+              onTap: (language) => controller.setLearningLanguage(language.code),
             ),
             const SizedBox(height: 28),
             const Text(
@@ -121,54 +112,100 @@ class LanguageSettingsScreen extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _selectNative(
+    LanguageController controller,
+    TranslationLanguage language,
+  ) async {
+    await controller.setNativeLanguage(language.code);
+    // Keep the two sides distinct so the dictionary always has a real pair.
+    if (controller.settings.learningLanguage == language.code) {
+      final other = kTranslationLanguages.firstWhere((l) => l != language);
+      await controller.setLearningLanguage(other.code);
+    }
+  }
 }
 
-class _LanguageTile extends StatelessWidget {
-  const _LanguageTile({
-    required this.label,
-    required this.code,
+class _LanguageGrid extends StatelessWidget {
+  const _LanguageGrid({
+    required this.languages,
     required this.selected,
     required this.onTap,
   });
 
-  final String label;
-  final String code;
+  final List<TranslationLanguage> languages;
+  final TranslationLanguage? selected;
+  final ValueChanged<TranslationLanguage> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        for (final language in languages)
+          _LanguageChip(
+            language: language,
+            selected: language == selected,
+            onTap: () => onTap(language),
+          ),
+      ],
+    );
+  }
+}
+
+class _LanguageChip extends StatelessWidget {
+  const _LanguageChip({
+    required this.language,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final TranslationLanguage language;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: ZovaColors.surface,
-      borderRadius: BorderRadius.circular(16),
+      color: selected ? ZovaColors.primary : ZovaColors.surface,
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: selected
+                  ? ZovaColors.primary
+                  : ZovaColors.textSecondary.withValues(alpha: 0.15),
+            ),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: ZovaColors.textPrimary,
+                language.nativeName,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: selected ? Colors.white : ZovaColors.textPrimary,
                 ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                code,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: ZovaColors.textSecondary,
+              if (language.nativeName != language.name) ...[
+                const SizedBox(height: 2),
+                Text(
+                  language.name,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: selected
+                        ? Colors.white.withValues(alpha: 0.85)
+                        : ZovaColors.textSecondary,
+                  ),
                 ),
-              ),
-              const Spacer(),
-              Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                color: selected ? ZovaColors.primary : ZovaColors.textSecondary,
-              ),
+              ],
             ],
           ),
         ),
