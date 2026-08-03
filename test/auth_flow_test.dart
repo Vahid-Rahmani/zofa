@@ -8,6 +8,7 @@ import 'package:zova/app.dart';
 import 'package:zova/core/state/app_controller.dart';
 import 'package:zova/core/state/language_controller.dart';
 import 'package:zova/data/services/dictionary_service.dart';
+import 'package:zova/data/services/english_frequency.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +23,10 @@ void main() {
     DictionaryService.seedAsset(
       'assets/dictionary/german.json',
       await File('assets/dictionary/german.json').readAsString(),
+    );
+    EnglishFrequencyList.seedAsset(
+      'assets/dictionary/english_top_50k.json',
+      await File('assets/dictionary/english_top_50k.json').readAsString(),
     );
   });
 
@@ -69,16 +74,17 @@ void main() {
     // Signed in -> home shell with the Home dashboard tab.
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Courses'), findsOneWidget);
+    expect(find.text('Vocabulary'), findsWidgets); // nav label + home card
     expect(find.text('Dictionary'), findsOneWidget);
     expect(find.text('Profile'), findsOneWidget);
 
     // The Learn grid sits below the fold; scroll it into view.
     await tester.scrollUntilVisible(
-      find.text('Vocabulary'),
+      find.text('Listening & Reading'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('Vocabulary'), findsOneWidget);
+    expect(find.text('Vocabulary'), findsWidgets); // nav label + home card
     expect(find.text('Listening & Reading'), findsOneWidget);
     expect(find.text('Grammar'), findsOneWidget);
 

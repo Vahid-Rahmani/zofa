@@ -7,6 +7,7 @@ import '../../core/widgets/tr_text.dart';
 import '../courses/courses_screen.dart';
 import '../dictionary/dictionary_screen.dart';
 import '../profile/profile_screen.dart';
+import '../vocabulary/vocabulary_screen.dart';
 import 'home_screen.dart';
 
 /// Main logged-in shell with the primary tabs.
@@ -32,6 +33,7 @@ class _HomeShellBodyState extends State<_HomeShellBody> {
   late final List<Widget> _tabs = [
     HomeScreen(onNavigateToTab: (index) => setState(() => _index = index)),
     const CoursesScreen(),
+    const VocabularyScreen(),
     const DictionaryScreen(),
     const ProfileScreen(),
   ];
@@ -64,6 +66,11 @@ class _HomeShellBodyState extends State<_HomeShellBody> {
             icon: const Icon(Icons.map_outlined),
             selectedIcon: const Icon(Icons.map),
             label: context.tr('Courses'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.style_outlined),
+            selectedIcon: const Icon(Icons.style),
+            label: context.tr('Vocabulary'),
           ),
           NavigationDestination(
             icon: const Icon(Icons.translate),
