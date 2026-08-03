@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
 import '../../core/state/language_controller.dart';
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../data/models/translation_language.dart';
 import '../../data/models/translation_result.dart';
 import '../../data/offline/starter_words.dart';
@@ -98,14 +100,15 @@ class _LeitnerBoxScreenState extends State<LeitnerBoxScreen> {
         dueByBox[state.box] = (dueByBox[state.box] ?? 0) + 1;
       }
     }
+    context.watch<UiTranslationController?>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Leitner Box')),
+      appBar: AppBar(title: const TrText('Leitner Box')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
           children: [
-            const Text(
+            const TrText(
               'Words you never forget',
               style: TextStyle(
                 fontSize: 26,
@@ -114,7 +117,7 @@ class _LeitnerBoxScreenState extends State<LeitnerBoxScreen> {
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            const TrText(
               'Review words in short sessions. Right answers move words '
               'to a higher box, wrong answers send them back to box 1.',
               style: TextStyle(color: ZovaColors.textSecondary, height: 1.4),
@@ -131,7 +134,7 @@ class _LeitnerBoxScreenState extends State<LeitnerBoxScreen> {
             if (total == 0)
               const _EmptyState()
             else ...[
-              const Text(
+              const TrText(
                 'Your boxes',
                 style: TextStyle(
                   fontSize: 20,
@@ -248,7 +251,11 @@ class _WordPoolCardState extends State<_WordPoolCard> {
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Added ${_pool.length} words to your Leitner Box'),
+        content: Text(
+          context.trTempl('Added {0} words to your Leitner Box', [
+            _pool.length,
+          ]),
+        ),
       ),
     );
     _computePool(reseed: true);
@@ -256,6 +263,7 @@ class _WordPoolCardState extends State<_WordPoolCard> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -273,7 +281,7 @@ class _WordPoolCardState extends State<_WordPoolCard> {
               const Icon(Icons.style, color: ZovaColors.primary, size: 22),
               const SizedBox(width: 10),
               const Expanded(
-                child: Text(
+                child: TrText(
                   'Word pool',
                   style: TextStyle(
                     fontSize: 16,
@@ -283,7 +291,7 @@ class _WordPoolCardState extends State<_WordPoolCard> {
                 ),
               ),
               IconButton(
-                tooltip: 'Shuffle',
+                tooltip: context.tr('Shuffle'),
                 onPressed: () => _computePool(reseed: true),
                 icon: const Icon(Icons.shuffle, size: 20),
                 visualDensity: VisualDensity.compact,
@@ -291,7 +299,7 @@ class _WordPoolCardState extends State<_WordPoolCard> {
             ],
           ),
           const SizedBox(height: 4),
-          const Text(
+          const TrText(
             'Common starter words for your language — add a handful to your '
             'boxes straight away. Translations load live and stay cached.',
             style: TextStyle(
@@ -380,7 +388,7 @@ class _WordPoolCardState extends State<_WordPoolCard> {
           else if (_pool.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 6),
-              child: Text(
+              child: TrText(
                 'No new words at this level — try another one.',
                 style: TextStyle(color: ZovaColors.textSecondary),
               ),
@@ -441,7 +449,9 @@ class _WordPoolCardState extends State<_WordPoolCard> {
                 onPressed: _addAll,
                 icon: const Icon(Icons.playlist_add, size: 20),
                 label: Text(
-                  'Add ${_pool.length} words to my boxes',
+                  context.trTempl('Add {0} words to my boxes', [
+                    _pool.length,
+                  ]),
                 ),
               ),
             ),
@@ -466,6 +476,7 @@ class _BoxStatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -483,10 +494,13 @@ class _BoxStatsCard extends StatelessWidget {
           Expanded(
             child: Text(
               total == 0
-                  ? 'No words yet — add some to start reviewing.'
+                  ? context.tr('No words yet — add some to start reviewing.')
                   : dueToday == 0
-                      ? '$total words across your boxes'
-                      : '$total words · $dueToday due today',
+                      ? context.trTempl('{0} words across your boxes', [total])
+                      : context.trTempl('{0} words · {1} due today', [
+                          total,
+                          dueToday,
+                        ]),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 15,
@@ -516,7 +530,7 @@ class _EmptyState extends StatelessWidget {
           Icon(Icons.auto_awesome,
               color: ZovaColors.textSecondary, size: 34),
           SizedBox(height: 12),
-          Text(
+          TrText(
             'Build your Leitner Box',
             style: TextStyle(
               fontSize: 17,
@@ -525,7 +539,7 @@ class _EmptyState extends StatelessWidget {
             ),
           ),
           SizedBox(height: 6),
-          Text(
+          TrText(
             'Tap the bookmark on any dictionary word, or use "My Words" to '
             'add saved words to the box.',
             textAlign: TextAlign.center,
@@ -567,8 +581,12 @@ class _BoxCard extends StatelessWidget {
       4 => ZovaColors.secondary,
       _ => ZovaColors.success,
     };
+    context.watch<UiTranslationController?>();
 
-    final dueLabel = dueToday == 0 ? null : ' · $dueToday due today';
+    final scheduleLabel = context.tr(schedule);
+    final countLabel = count == 1 ? context.tr('word') : context.tr('words');
+    final dueLabel =
+        dueToday == 0 ? null : ' · ${context.trTempl('{0} due today', [dueToday])}';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -601,7 +619,7 @@ class _BoxCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Box $box',
+                  context.trTempl('Box {0}', [box]),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
@@ -610,7 +628,7 @@ class _BoxCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$schedule · $count ${count == 1 ? 'word' : 'words'}$dueLabel',
+                  '$scheduleLabel · $count $countLabel$dueLabel',
                   style: const TextStyle(
                     fontSize: 13,
                     color: ZovaColors.textSecondary,
@@ -625,7 +643,7 @@ class _BoxCard extends StatelessWidget {
               disabledForegroundColor:
                   ZovaColors.textSecondary.withValues(alpha: 0.4),
             ),
-            child: const Text('Study'),
+            child: Text(context.tr('Study')),
           ),
         ],
       ),

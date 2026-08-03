@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../../core/state/ui_translation_controller.dart';
 import '../../../../core/theme/zova_colors.dart';
 import '../../../../core/widgets/gradient_button.dart';
+import '../../../../core/widgets/tr_text.dart';
 import '../../../../data/models/exercise.dart';
 
 /// Study session: flip a card to reveal the translation, then mark it as
@@ -40,6 +43,7 @@ class _FlashcardViewState extends State<FlashcardView> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -91,7 +95,7 @@ class _FlashcardViewState extends State<FlashcardView> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
+          TrText(
             'Tap the card to flip it',
             style: TextStyle(
               fontSize: 13,
@@ -104,13 +108,13 @@ class _FlashcardViewState extends State<FlashcardView> {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () => _answer(false),
-                  child: const Text('Still learning'),
+                  child: Text(context.tr('Still learning')),
                 ),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: GradientButton(
-                  label: 'Got it',
+                  label: context.tr('Got it'),
                   onPressed: () => _answer(true),
                 ),
               ),

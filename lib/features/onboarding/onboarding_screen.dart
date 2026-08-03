@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../core/widgets/gradient_button.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../data/models/translation_language.dart';
 
 /// One full-screen page inside the onboarding flow.
@@ -158,7 +161,7 @@ class _LanguagePickerPage extends StatelessWidget {
         children: [
           Center(child: Text(page.emoji, style: const TextStyle(fontSize: 72))),
           const SizedBox(height: 24),
-          Text(
+          TrText(
             page.title,
             textAlign: TextAlign.center,
             style: const TextStyle(
@@ -168,7 +171,7 @@ class _LanguagePickerPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          Text(
+          TrText(
             page.subtitle,
             textAlign: TextAlign.center,
             style: const TextStyle(
@@ -271,6 +274,7 @@ class _BottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLast = index >= total - 1;
+    context.watch<UiTranslationController?>();
     return Padding(
       padding: const EdgeInsets.fromLTRB(28, 8, 28, 28),
       child: Column(
@@ -296,7 +300,7 @@ class _BottomBar extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           GradientButton(
-            label: isLast ? 'Start learning' : 'Continue',
+            label: context.tr(isLast ? 'Start learning' : 'Continue'),
             icon: isLast ? null : Icons.arrow_forward,
             onPressed: onNext,
           ),

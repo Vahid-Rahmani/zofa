@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../data/models/grammar_topic.dart';
 import '../../data/services/grammar_content.dart';
 
@@ -13,12 +16,12 @@ class GrammarScreen extends StatelessWidget {
     const levelOrder = ['A1', 'A2', 'B1'];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Grammar')),
+      appBar: AppBar(title: const TrText('Grammar')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
           children: [
-            const Text(
+            const TrText(
               'Understand how English works',
               style: TextStyle(
                 fontSize: 26,
@@ -27,7 +30,7 @@ class GrammarScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            const TrText(
               'Short explanations with real examples, from A1 to B1.',
               style: TextStyle(color: ZovaColors.textSecondary, height: 1.4),
             ),
@@ -59,6 +62,7 @@ class _LevelGroup extends StatelessWidget {
       'A2' => ZovaColors.primary,
       _ => ZovaColors.warning,
     };
+    context.watch<UiTranslationController?>();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,7 +85,7 @@ class _LevelGroup extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              '${topics.length} topics',
+              context.trTempl('{0} topics', [topics.length]),
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -254,7 +258,7 @@ class GrammarDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 22),
-            const Text(
+            const TrText(
               'Examples',
               style: TextStyle(
                 fontSize: 14,

@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
 import '../../core/state/language_controller.dart';
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../data/models/translation_result.dart';
 import '../../data/services/translation_service.dart';
 
@@ -23,7 +25,7 @@ class MyWordsScreen extends StatelessWidget {
     final languageCode = settings.nativeLanguage;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('My Words')),
+      appBar: AppBar(title: const TrText('My Words')),
       body: SafeArea(
         child: _SavedWordsList(
           key: ValueKey(savedWords),
@@ -105,11 +107,12 @@ class _SavedWordsListState extends State<_SavedWordsList> {
   @override
   Widget build(BuildContext context) {
     final entries = [for (final word in widget.words) _entryOf(word)];
+    context.watch<UiTranslationController?>();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
       children: [
-        const Text(
+        const TrText(
           'Words you saved',
           style: TextStyle(
             fontSize: 26,
@@ -120,9 +123,15 @@ class _SavedWordsListState extends State<_SavedWordsList> {
         const SizedBox(height: 6),
         Text(
           _loading
-              ? 'Resolving translations…'
-              : '${entries.length} ${entries.length == 1 ? 'word' : 'words'} · '
-                  'bookmark words from the dictionary to keep them here.',
+              ? context.tr('Resolving translations…')
+              : context.trTempl(
+                  entries.length == 1
+                      ? '{0} word · bookmark words from the dictionary to '
+                          'keep them here.'
+                      : '{0} words · bookmark words from the dictionary to '
+                          'keep them here.',
+                  [entries.length],
+                ),
           style: const TextStyle(
             color: ZovaColors.textSecondary,
             height: 1.4,
@@ -141,13 +150,16 @@ class _SavedWordsListState extends State<_SavedWordsList> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    'Added ${entries.length} words to your Leitner Box',
+                    context.trTempl(
+                      'Added {0} words to your Leitner Box',
+                      [entries.length],
+                    ),
                   ),
                 ),
               );
             },
             icon: const Icon(Icons.style, size: 20),
-            label: const Text('Add all to Leitner Box'),
+            label: Text(context.tr('Add all to Leitner Box')),
           ),
         const SizedBox(height: 20),
         if (_loading)
@@ -170,14 +182,24 @@ class _SavedWordsListState extends State<_SavedWordsList> {
               onAddToLeitner: () {
                 widget.controller.addToLeitner(entry.word);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Added "${entry.word}" to Leitner')),
+                  SnackBar(
+                    content: Text(
+                      context.trTempl('Added "{0}" to Leitner', [
+                        entry.word,
+                      ]),
+                    ),
+                  ),
                 );
               },
               onRemove: () {
                 widget.controller.removeSavedWord(entry.word);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Removed "${entry.word}" from My Words'),
+                    content: Text(
+                      context.trTempl('Removed "{0}" from My Words', [
+                        entry.word,
+                      ]),
+                    ),
                   ),
                 );
               },
@@ -219,7 +241,7 @@ class _EmptyState extends StatelessWidget {
           Icon(Icons.bookmark_add_outlined,
               color: ZovaColors.textSecondary, size: 36),
           SizedBox(height: 12),
-          Text(
+          TrText(
             'No saved words yet',
             style: TextStyle(
               fontSize: 17,
@@ -228,7 +250,7 @@ class _EmptyState extends StatelessWidget {
             ),
           ),
           SizedBox(height: 6),
-          Text(
+          TrText(
             'Open any word in the Dictionary and tap the bookmark to save '
             'it here for quick revision.',
             textAlign: TextAlign.center,
@@ -263,6 +285,7 @@ class _WordCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final result = entry.result;
     final rtl = result?.isRtl ?? false;
+    context.watch<UiTranslationController?>();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -310,7 +333,7 @@ class _WordCard extends StatelessWidget {
                           size: 14, color: ZovaColors.textSecondary),
                       const SizedBox(width: 6),
                       const Expanded(
-                        child: Text(
+                        child: TrText(
                           'Offline — tap to retry',
                           style: TextStyle(
                             fontSize: 13,
@@ -319,7 +342,7 @@ class _WordCard extends StatelessWidget {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Retry',
+                        tooltip: context.tr('Retry'),
                         onPressed: onRetry,
                         icon: const Icon(Icons.refresh, size: 18),
                         visualDensity: VisualDensity.compact,
@@ -340,7 +363,7 @@ class _WordCard extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Add to Leitner Box',
+            tooltip: context.tr('Add to Leitner Box'),
             onPressed: inLeitner ? null : onAddToLeitner,
             icon: Icon(
               inLeitner ? Icons.style : Icons.style_outlined,
@@ -348,7 +371,7 @@ class _WordCard extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Remove from My Words',
+            tooltip: context.tr('Remove from My Words'),
             onPressed: onRemove,
             icon: const Icon(Icons.bookmark_remove_outlined,
                 color: ZovaColors.textSecondary),

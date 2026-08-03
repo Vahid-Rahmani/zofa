@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/language_controller.dart';
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../data/models/translation_language.dart';
 import '../../data/services/translation_service.dart';
 
@@ -21,14 +23,15 @@ class LanguageSettingsScreen extends StatelessWidget {
     final settings = controller.settings;
     final native = TranslationLanguage.byCode(settings.nativeLanguage);
     final learning = TranslationLanguage.byCode(settings.learningLanguage);
+    context.watch<UiTranslationController?>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Language')),
+      appBar: AppBar(title: const TrText('Language')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
           children: [
-            const Text(
+            const TrText(
               'Native language',
               style: TextStyle(
                 fontSize: 18,
@@ -37,7 +40,7 @@ class LanguageSettingsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            const TrText(
               'The language you already speak. zova uses it for the '
               'interface, text direction and word explanations.',
               style: TextStyle(color: ZovaColors.textSecondary, fontSize: 13),
@@ -49,7 +52,7 @@ class LanguageSettingsScreen extends StatelessWidget {
               onTap: (language) => _selectNative(controller, language),
             ),
             const SizedBox(height: 28),
-            const Text(
+            const TrText(
               'Learning language',
               style: TextStyle(
                 fontSize: 18,
@@ -58,7 +61,7 @@ class LanguageSettingsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            const TrText(
               'The language you are learning. Dictionary lookups default to '
               'translating between this and your native language.',
               style: TextStyle(color: ZovaColors.textSecondary, fontSize: 13),
@@ -73,7 +76,7 @@ class LanguageSettingsScreen extends StatelessWidget {
               onTap: (language) => controller.setLearningLanguage(language.code),
             ),
             const SizedBox(height: 28),
-            const Text(
+            const TrText(
               'Dictionary cache',
               style: TextStyle(
                 fontSize: 18,
@@ -82,7 +85,7 @@ class LanguageSettingsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            const TrText(
               'Lookups are cached on-device so recently viewed words open '
               'instantly and work offline.',
               style: TextStyle(color: ZovaColors.textSecondary, fontSize: 13),
@@ -98,13 +101,13 @@ class LanguageSettingsScreen extends StatelessWidget {
                   await TranslationService.instance.clearCache();
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Cached translations cleared'),
+                    SnackBar(
+                      content: Text(context.tr('Cached translations cleared')),
                     ),
                   );
                 },
                 icon: const Icon(Icons.delete_sweep_outlined, size: 20),
-                label: const Text('Clear cached translations'),
+                label: Text(context.tr('Clear cached translations')),
               ),
             ),
           ],

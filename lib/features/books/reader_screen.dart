@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
 import '../../core/state/language_controller.dart';
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../core/utils/clean_text.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../data/models/book.dart';
 import '../../data/models/translation_result.dart';
 import '../../data/services/translation_service.dart';
@@ -66,6 +68,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -91,7 +94,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
               size: 20,
             ),
             label: Text(
-              _showPersian ? 'Persian' : 'English',
+              context.tr(_showPersian ? 'Persian' : 'English'),
               style: TextStyle(
                 color: _showPersian
                     ? ZovaColors.secondary
@@ -150,6 +153,8 @@ class _WordLookupSheet extends StatefulWidget {
 }
 
 class _WordLookupSheetState extends State<_WordLookupSheet> {
+  static const _noTranslationKey = '__no_translation__';
+
   TranslationResult? _result;
   bool _loading = true;
   String? _error;
@@ -174,7 +179,7 @@ class _WordLookupSheetState extends State<_WordLookupSheet> {
       setState(() {
         _loading = false;
         if (result == null) {
-          _error = 'No translation found for "${widget.word}".';
+          _error = _noTranslationKey;
         } else {
           _result = result;
         }
@@ -190,6 +195,10 @@ class _WordLookupSheetState extends State<_WordLookupSheet> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
+    final errorText = _error == _noTranslationKey
+        ? context.trTempl('No translation found for "{0}".', [widget.word])
+        : _error;
     return Padding(
       padding: const EdgeInsets.fromLTRB(28, 24, 28, 32),
       child: SafeArea(
@@ -203,14 +212,15 @@ class _WordLookupSheetState extends State<_WordLookupSheet> {
                       const CircularProgressIndicator(strokeWidth: 3),
                       const SizedBox(height: 14),
                       Text(
-                        'Looking up “${widget.word}”…',
-                        style: const TextStyle(color: ZovaColors.textSecondary),
+                        context.trTempl('Looking up "{0}"…', [widget.word]),
+                        style:
+                            const TextStyle(color: ZovaColors.textSecondary),
                       ),
                     ],
                   ),
                 ),
               )
-            : _error != null
+            : errorText != null
                 ? Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -225,7 +235,7 @@ class _WordLookupSheetState extends State<_WordLookupSheet> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        _error!,
+                        errorText,
                         style: const TextStyle(
                           fontSize: 15,
                           height: 1.4,
@@ -240,7 +250,7 @@ class _WordLookupSheetState extends State<_WordLookupSheet> {
                           foregroundColor: Colors.white,
                         ),
                         icon: const Icon(Icons.refresh, size: 18),
-                        label: const Text('Try again'),
+                        label: Text(context.tr('Try again')),
                       ),
                     ],
                   )
@@ -346,7 +356,7 @@ class _WordLookupSheetState extends State<_WordLookupSheet> {
         ],
         const SizedBox(height: 12),
         Text(
-          'Tap any word in the story to see its meaning.',
+          context.tr('Tap any word in the story to see its meaning.'),
           style: TextStyle(
             fontSize: 12,
             color: ZovaColors.textSecondary.withValues(alpha: 0.7),
@@ -381,7 +391,7 @@ class _ParagraphPage extends StatelessWidget {
               color: ZovaColors.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Text(
+            child: const TrText(
               'CHAPTER',
               style: TextStyle(
                 fontSize: 11,
@@ -573,6 +583,7 @@ class _ChapterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Container(
       color: ZovaColors.surface,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -584,7 +595,7 @@ class _ChapterBar extends StatelessWidget {
           ),
           Expanded(
             child: Text(
-              'Chapter $current of $total',
+              context.trTempl('Chapter {0} of {1}', [current, total]),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: ZovaColors.textSecondary,

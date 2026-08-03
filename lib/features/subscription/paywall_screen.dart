@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../core/config/env_config.dart';
 import '../../core/state/app_controller.dart';
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../core/widgets/gradient_button.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../core/widgets/zova_logo.dart';
 import '../../data/models/subscription_plan.dart';
 
@@ -40,12 +42,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
           builder: (context) => AlertDialog(
             icon: const Icon(Icons.check_circle,
                 color: ZovaColors.success, size: 40),
-            title: const Text('Welcome to Premium!'),
-            content: const Text('Every lesson and book is now unlocked.'),
+            title: Text(context.tr('Welcome to Premium!')),
+            content: Text(context.tr('Every lesson and book is now unlocked.')),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Done'),
+                child: Text(context.tr('Done')),
               ),
             ],
           ),
@@ -62,6 +64,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
   @override
   Widget build(BuildContext context) {
     final hasStripe = EnvConfig.hasStripe;
+    context.watch<UiTranslationController?>();
 
     return Scaffold(
       body: SafeArea(
@@ -78,7 +81,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
             const SizedBox(height: 8),
             const Center(child: ZovaLogo(size: 56)),
             const SizedBox(height: 24),
-            const Text(
+            const TrText(
               'Go Premium',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -88,7 +91,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            const TrText(
               'Unlock every lesson, book and game.',
               textAlign: TextAlign.center,
               style: TextStyle(color: ZovaColors.textSecondary),
@@ -117,18 +120,20 @@ class _PaywallScreenState extends State<PaywallScreen> {
               const SizedBox(height: 12),
             ],
             GradientButton(
-              label: 'Start ${_selected.name.toLowerCase()} plan',
+              label: context.trTempl('Start {0} plan', [
+                _selected.name.toLowerCase(),
+              ]),
               icon: Icons.lock_outline,
               loading: _processing,
               onPressed: _subscribe,
             ),
             const SizedBox(height: 16),
-            Text(
+            const TrText(
               'Cancel anytime. Payments are processed securely by Stripe.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
-                color: ZovaColors.textSecondary.withValues(alpha: 0.8),
+                color: ZovaColors.textSecondary,
               ),
             ),
           ],
@@ -196,7 +201,7 @@ class _PlanTile extends StatelessWidget {
                             color: ZovaColors.primary,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Text(
+                          child: const TrText(
                             'Popular',
                             style: TextStyle(
                               fontSize: 11,
@@ -243,7 +248,7 @@ class _DemoModeNotice extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: ZovaColors.warning.withValues(alpha: 0.4)),
       ),
-      child: const Text(
+      child: const TrText(
         'Demo mode: Stripe is not configured, so the purchase is simulated. '
         'Add your publishable key and the Edge Function URL to go live.',
         style: TextStyle(color: ZovaColors.textPrimary, fontSize: 13),

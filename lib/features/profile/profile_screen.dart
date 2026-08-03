@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
 import '../../core/state/language_controller.dart';
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../data/models/app_user.dart';
 import '../../data/models/translation_language.dart';
 import '../../data/models/user_progress.dart';
@@ -139,6 +141,7 @@ class _StatsGrid extends StatelessWidget {
       ('Words', '${progress.wordsLearned}', Icons.style, ZovaColors.secondary),
       ('Lessons', '$lessonsCompleted', Icons.school, ZovaColors.success),
     ];
+    context.watch<UiTranslationController?>();
 
     return GridView.count(
       crossAxisCount: 2,
@@ -170,7 +173,7 @@ class _StatsGrid extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  label,
+                  context.tr(label),
                   style: const TextStyle(color: ZovaColors.textSecondary),
                 ),
               ],
@@ -194,6 +197,7 @@ class _LeagueCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Material(
       color: ZovaColors.surface,
       borderRadius: BorderRadius.circular(20),
@@ -212,7 +216,7 @@ class _LeagueCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$tier league',
+                      context.trTempl('{0} league', [tier]),
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
@@ -221,7 +225,7 @@ class _LeagueCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'You are #$position this week',
+                      context.trTempl('You are #{0} this week', [position]),
                       style: const TextStyle(
                         fontSize: 12,
                         color: ZovaColors.textSecondary,
@@ -255,6 +259,7 @@ class _BadgesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Material(
       color: ZovaColors.surface,
       borderRadius: BorderRadius.circular(20),
@@ -273,7 +278,10 @@ class _BadgesCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$earnedCount of $totalCount badges',
+                      context.trTempl('{0} of {1} badges', [
+                        earnedCount,
+                        totalCount,
+                      ]),
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
@@ -290,7 +298,7 @@ class _BadgesCard extends StatelessWidget {
                                 style: const TextStyle(fontSize: 18)),
                           ),
                         if (earnedIcons.isEmpty)
-                          const Text(
+                          const TrText(
                             'Complete lessons, build streaks and grow your '
                             'vocabulary to earn badges.',
                             style: TextStyle(
@@ -322,6 +330,7 @@ class _PremiumCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -342,8 +351,8 @@ class _PremiumCard extends StatelessWidget {
           Expanded(
             child: Text(
               active
-                  ? 'zova Premium active'
-                  : 'Unlock every lesson and book',
+                  ? context.tr('zova Premium active')
+                  : context.tr('Unlock every lesson and book'),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 15,
@@ -354,9 +363,9 @@ class _PremiumCard extends StatelessWidget {
           if (!active)
             TextButton(
               onPressed: onTap,
-              child: const Text(
-                'See plans',
-                style: TextStyle(
+              child: Text(
+                context.tr('See plans'),
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
                   decoration: TextDecoration.underline,
@@ -384,6 +393,7 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Material(
       color: ZovaColors.surface,
       borderRadius: BorderRadius.circular(20),
@@ -391,7 +401,7 @@ class _SettingsCard extends StatelessWidget {
         children: [
           ListTile(
             leading: const Icon(Icons.face, color: ZovaColors.primary),
-            title: const Text('Avatar'),
+            title: const TrText('Avatar'),
             trailing: Text(
               user.avatarEmoji,
               style: const TextStyle(fontSize: 22),
@@ -401,8 +411,8 @@ class _SettingsCard extends StatelessWidget {
           const Divider(color: ZovaColors.surfaceRaised, height: 1),
           ListTile(
             leading: const Icon(Icons.language, color: ZovaColors.primary),
-            title: const Text('Language'),
-            subtitle: const Text('Interface & translations'),
+            title: const TrText('Language'),
+            subtitle: const TrText('Interface & translations'),
             trailing: const Icon(Icons.chevron_right,
                 color: ZovaColors.textSecondary),
             onTap: () {
@@ -416,7 +426,10 @@ class _SettingsCard extends StatelessWidget {
           const Divider(color: ZovaColors.surfaceRaised, height: 1),
           ListTile(
             leading: const Icon(Icons.logout, color: ZovaColors.error),
-            title: const Text('Sign out', style: TextStyle(color: ZovaColors.error)),
+            title: const TrText(
+              'Sign out',
+              style: TextStyle(color: ZovaColors.error),
+            ),
             onTap: () => _confirmLogout(context),
           ),
         ],
@@ -436,9 +449,9 @@ class _SettingsCard extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Pick an avatar',
-              style: TextStyle(
+            Text(
+              context.tr('Pick an avatar'),
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
                 color: ZovaColors.textPrimary,
@@ -478,16 +491,16 @@ class _SettingsCard extends StatelessWidget {
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Sign out?'),
-        content: const Text('Your progress is saved on this device.'),
+        title: Text(context.tr('Sign out?')),
+        content: Text(context.tr('Your progress is saved on this device.')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.tr('Cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sign out'),
+            child: Text(context.tr('Sign out')),
           ),
         ],
       ),

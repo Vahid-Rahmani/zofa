@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../data/models/gamification_state.dart';
 import '../../data/services/gamification_catalog.dart';
 
@@ -21,11 +23,14 @@ class LeagueScreen extends StatelessWidget {
         gamification.ownedItems[GamificationState.itemXpBoost] ?? 0;
     final freezeCount =
         gamification.ownedItems[GamificationState.itemStreakFreeze] ?? 0;
+    context.watch<UiTranslationController?>();
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('League · ${league.tier}',
-            style: const TextStyle(fontSize: 18)),
+        title: Text(
+          context.trTempl('League · {0}', [league.tier]),
+          style: const TextStyle(fontSize: 18),
+        ),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -34,7 +39,7 @@ class LeagueScreen extends StatelessWidget {
           children: [
             _TierBanner(league: league),
             const SizedBox(height: 20),
-            const Text(
+            const TrText(
               'This week',
               style: TextStyle(
                 fontSize: 18,
@@ -45,7 +50,7 @@ class LeagueScreen extends StatelessWidget {
             const SizedBox(height: 10),
             _LeagueList(league: league),
             const SizedBox(height: 28),
-            const Text(
+            const TrText(
               'Power-ups',
               style: TextStyle(
                 fontSize: 18,
@@ -59,8 +64,10 @@ class LeagueScreen extends StatelessWidget {
               onClaim: () {
                 controller.claimDailyGift();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Daily gift claimed! +1 XP boost, +1 freeze'),
+                  SnackBar(
+                    content: Text(
+                      context.tr('Daily gift claimed! +1 XP boost, +1 freeze'),
+                    ),
                   ),
                 );
               },
@@ -79,8 +86,10 @@ class LeagueScreen extends StatelessWidget {
                   : () {
                       controller.activateBoost();
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('XP boost active for 15 minutes!'),
+                        SnackBar(
+                          content: Text(
+                            context.tr('XP boost active for 15 minutes!'),
+                          ),
                         ),
                       );
                     },
@@ -110,6 +119,7 @@ class _TierBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -129,7 +139,7 @@ class _TierBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${league.tier} league',
+                  context.trTempl('{0} league', [league.tier]),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -138,8 +148,10 @@ class _TierBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'You are #${league.playerPosition} this week · '
-                  '${league.playerXp} XP',
+                  context.trTempl('You are #{0} this week · {1} XP', [
+                    league.playerPosition,
+                    league.playerXp,
+                  ]),
                   style: const TextStyle(color: Colors.white70, fontSize: 13),
                 ),
               ],
@@ -331,6 +343,7 @@ class _DailyGiftCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -346,7 +359,7 @@ class _DailyGiftCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                TrText(
                   'Daily gift',
                   style: TextStyle(
                     fontSize: 15,
@@ -354,7 +367,7 @@ class _DailyGiftCard extends StatelessWidget {
                     color: ZovaColors.textPrimary,
                   ),
                 ),
-                Text(
+                TrText(
                   'One XP boost + one streak freeze, free.',
                   style: TextStyle(
                       fontSize: 12, color: ZovaColors.textSecondary),
@@ -365,7 +378,7 @@ class _DailyGiftCard extends StatelessWidget {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: ZovaColors.warning),
             onPressed: available ? onClaim : null,
-            child: Text(available ? 'Claim' : 'Claimed'),
+            child: Text(context.tr(available ? 'Claim' : 'Claimed')),
           ),
         ],
       ),
@@ -396,6 +409,7 @@ class _PowerUpTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -422,7 +436,7 @@ class _PowerUpTile extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      title,
+                      context.tr(title),
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
@@ -442,7 +456,7 @@ class _PowerUpTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  subtitle,
+                  context.tr(subtitle),
                   style: const TextStyle(
                       fontSize: 12, color: ZovaColors.textSecondary),
                 ),
@@ -455,7 +469,7 @@ class _PowerUpTile extends StatelessWidget {
               backgroundColor: active ? color : ZovaColors.primary,
             ),
             onPressed: onPressed,
-            child: Text(actionLabel),
+            child: Text(context.tr(actionLabel)),
           ),
         ],
       ),

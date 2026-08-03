@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../../core/state/ui_translation_controller.dart';
 import '../../../../core/theme/zova_colors.dart';
 import '../../../../core/widgets/gradient_button.dart';
+import '../../../../core/widgets/tr_text.dart';
 import '../../../../data/models/exercise.dart';
 
 /// Multiple-choice question: pick the correct translation for the prompt.
@@ -34,6 +37,7 @@ class _ChooseAnswerViewState extends State<ChooseAnswerView> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -62,7 +66,7 @@ class _ChooseAnswerViewState extends State<ChooseAnswerView> {
           const SizedBox(height: 8),
           if (_answered)
             GradientButton(
-              label: 'Continue',
+              label: context.tr('Continue'),
               icon: Icons.arrow_forward,
               onPressed: () => widget.onDone(_isCorrect),
             ),

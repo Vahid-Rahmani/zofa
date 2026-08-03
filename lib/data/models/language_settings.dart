@@ -1,7 +1,9 @@
-/// Languages the app's UI can be rendered in.
+/// UI language flags for the two built-in interfaces.
 ///
-/// The app ships a Persian and an English interface. Every other native
-/// language falls back to the English UI.
+/// The app ships a Persian and an English interface natively; every other
+/// native language is rendered through the live Google UI translation layer
+/// (see [UiTranslationController]), driven by the ISO code in
+/// [LanguageSettings.uiLanguageCode].
 enum AppLanguage {
   english('en', 'English'),
   persian('fa', 'فارسی');
@@ -22,8 +24,9 @@ enum AppLanguage {
 /// they are learning. Both are ISO 639-1 codes and together define the
 /// app-wide language behaviour:
 ///
-/// * the interface language and text direction derive from [nativeLanguage]
-///   (Persian flips the UI to RTL, everything else stays LTR English);
+/// * the interface language and text direction derive from [nativeLanguage]:
+///   the built-in Persian interface flips the UI to RTL, and every other
+///   native language gets a live-translated interface via Google Translate;
 /// * dictionary/explanation defaults point at the native ↔ learning pair.
 class LanguageSettings {
   const LanguageSettings({
@@ -41,12 +44,21 @@ class LanguageSettings {
   /// native language is Persian, English otherwise.
   AppLanguage get uiLanguage => AppLanguage.fromCode(nativeLanguage);
 
+  /// ISO code the UI should be rendered in: the learner's native language.
+  /// English and Persian use the built-in interfaces; any other code drives
+  /// the live Google UI translation layer.
+  String get uiLanguageCode => nativeLanguage;
+
   /// Preferred translation/explanation language: the learner reads meanings
   /// in their native language.
   AppLanguage get translationLanguage => AppLanguage.fromCode(nativeLanguage);
 
-  /// Whether the UI should render right-to-left (Persian interface).
-  bool get isRtlUi => uiLanguage == AppLanguage.persian;
+  /// Whether the UI should render right-to-left (Persian or Arabic native
+  /// language).
+  bool get isRtlUi {
+    final code = nativeLanguage;
+    return code == 'fa' || code == 'ar';
+  }
 
   LanguageSettings copyWith({
     String? nativeLanguage,

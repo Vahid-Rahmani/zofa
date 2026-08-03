@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
 import '../../core/state/language_controller.dart';
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../data/models/translation_result.dart';
 import '../gamification/hearts_bar.dart';
 
@@ -51,9 +53,13 @@ class _LeitnerReviewScreenState extends State<LeitnerReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Scaffold(
       appBar: AppBar(
-        title: Text('Box ${widget.box}', style: const TextStyle(fontSize: 18)),
+        title: Text(
+          context.trTempl('Box {0}', [widget.box]),
+          style: const TextStyle(fontSize: 18),
+        ),
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.close),
@@ -80,7 +86,10 @@ class _LeitnerReviewScreenState extends State<LeitnerReviewScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Card ${_index + 1} of ${widget.words.length}',
+                      context.trTempl('Card {0} of {1}', [
+                        _index + 1,
+                        widget.words.length,
+                      ]),
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: ZovaColors.textSecondary,
@@ -106,7 +115,7 @@ class _LeitnerReviewScreenState extends State<LeitnerReviewScreen> {
                     ),
                     const SizedBox(height: 20),
                     if (!_revealed)
-                      const Text(
+                      const TrText(
                         'Tap the card to reveal the meaning',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: ZovaColors.textSecondary),
@@ -122,7 +131,7 @@ class _LeitnerReviewScreenState extends State<LeitnerReviewScreen> {
                                 minimumSize: const Size(0, 54),
                               ),
                               onPressed: () => _answer(knew: false),
-                              child: const Text('Still learning'),
+                              child: Text(context.tr('Still learning')),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -134,7 +143,7 @@ class _LeitnerReviewScreenState extends State<LeitnerReviewScreen> {
                                 minimumSize: const Size(0, 54),
                               ),
                               onPressed: () => _answer(knew: true),
-                              child: const Text('Knew it'),
+                              child: Text(context.tr('Knew it')),
                             ),
                           ),
                         ],
@@ -240,7 +249,7 @@ class _Flashcard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          const Text(
+          const TrText(
             'Example',
             style: TextStyle(
               fontSize: 12,
@@ -293,6 +302,7 @@ class _Summary extends StatelessWidget {
   Widget build(BuildContext context) {
     final total = known + relearned;
     final nextBox = box < 5 ? box + 1 : 5;
+    context.watch<UiTranslationController?>();
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -302,7 +312,7 @@ class _Summary extends StatelessWidget {
           const Icon(Icons.emoji_events,
               color: ZovaColors.warning, size: 64),
           const SizedBox(height: 16),
-          const Text(
+          const TrText(
             'Session complete!',
             style: TextStyle(
               fontSize: 24,
@@ -312,7 +322,10 @@ class _Summary extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'You reviewed $total words in box $box.',
+            context.trTempl('You reviewed {0} words in box {1}.', [
+              total,
+              box,
+            ]),
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: ZovaColors.textSecondary,
@@ -345,10 +358,16 @@ class _Summary extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             known == 0 && relearned > 0
-                ? 'Keep practicing — every word you review moves forward.'
+                ? context.tr(
+                    'Keep practicing — every word you review moves forward.')
                 : box < 5 && known > 0
-                    ? 'Words you knew moved to box $nextBox.'
-                    : 'You are at the top box. Review less often, remember more.',
+                    ? context.trTempl(
+                        'Words you knew moved to box {0}.',
+                        [nextBox],
+                      )
+                    : context.tr(
+                        'You are at the top box. Review less often, remember '
+                        'more.'),
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: ZovaColors.textSecondary,
@@ -363,7 +382,7 @@ class _Summary extends StatelessWidget {
               backgroundColor: ZovaColors.primary,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Done'),
+            child: Text(context.tr('Done')),
           ),
         ],
       ),
@@ -384,6 +403,7 @@ class _SummaryStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Expanded(
       child: Column(
         children: [
@@ -397,7 +417,7 @@ class _SummaryStat extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            label,
+            context.tr(label),
             style: const TextStyle(color: ZovaColors.textSecondary),
           ),
         ],

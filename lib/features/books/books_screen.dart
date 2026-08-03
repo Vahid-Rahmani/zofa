@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../data/models/book.dart';
 import '../../data/services/seed_content.dart';
 import 'reader_screen.dart';
@@ -14,6 +16,7 @@ class BooksScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AppController>();
+    context.watch<UiTranslationController?>();
 
     final grouped = <String, List<Book>>{};
     for (final book in SeedContent.books) {
@@ -23,7 +26,7 @@ class BooksScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Books'),
+        title: const TrText('Books'),
         leading: BackButton(
           onPressed: () => Navigator.of(context).maybePop(),
         ),
@@ -34,7 +37,7 @@ class BooksScreen extends StatelessWidget {
             const SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(24, 12, 24, 8),
-                child: Text(
+                child: TrText(
                   'Tap any word to learn it.',
                   style: TextStyle(color: ZovaColors.textSecondary),
                 ),
@@ -57,11 +60,14 @@ class BooksScreen extends StatelessWidget {
                       final book = grouped[level]![index];
                       final lastRead =
                           controller.progress.bookProgress[book.id] ?? -1;
+                      final isNew = lastRead < 0;
                       return _BookCard(
                         book: book,
-                        progressLabel: lastRead >= 0
-                            ? 'Chapter ${lastRead + 1} of ${book.chapters.length}'
-                            : 'New',
+                        progressLabel: isNew
+                            ? context.tr('New')
+                            : context.trTempl('Chapter {0} of {1}',
+                                [lastRead + 1, book.chapters.length]),
+                        isNew: isNew,
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute<void>(
@@ -100,6 +106,7 @@ class _LevelHeader extends StatelessWidget {
       _ => 'B1 · Intermediate',
     };
     final count = SeedContent.books.where((b) => b.level == level).length;
+    context.watch<UiTranslationController?>();
 
     return Row(
       children: [
@@ -110,7 +117,7 @@ class _LevelHeader extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         Text(
-          label,
+          context.tr(label),
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w800,
@@ -119,7 +126,7 @@ class _LevelHeader extends StatelessWidget {
         ),
         const Spacer(),
         Text(
-          '$count ${count == 1 ? 'book' : 'books'}',
+          context.trTempl(count == 1 ? '{0} book' : '{0} books', [count]),
           style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
@@ -135,11 +142,13 @@ class _BookCard extends StatelessWidget {
   const _BookCard({
     required this.book,
     required this.progressLabel,
+    required this.isNew,
     required this.onTap,
   });
 
   final Book book;
   final String progressLabel;
+  final bool isNew;
   final VoidCallback onTap;
 
   @override
@@ -196,7 +205,7 @@ class _BookCard extends StatelessWidget {
                     Text(
                       progressLabel,
                       style: TextStyle(
-                        color: progressLabel == 'New'
+                        color: isNew
                             ? ZovaColors.primary
                             : ZovaColors.success,
                         fontSize: 13,

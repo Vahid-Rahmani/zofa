@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
 import '../../core/state/language_controller.dart';
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../data/models/translation_language.dart';
 import '../../data/models/translation_result.dart';
 import '../../data/services/german_frequency.dart';
@@ -272,6 +274,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -282,7 +285,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  const TrText(
                     'Dictionary',
                     style: TextStyle(
                       fontSize: 28,
@@ -291,7 +294,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  const TrText(
                     'Live lookups for any language pair — translations, '
                     'genders and examples are fetched on demand.',
                     style: TextStyle(
@@ -311,7 +314,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                       ),
                       const SizedBox(width: 8),
                       IconButton(
-                        tooltip: 'Swap languages',
+                        tooltip: context.tr('Swap languages'),
                         onPressed: _swap,
                         icon: const Icon(Icons.swap_horiz),
                         color: ZovaColors.primary,
@@ -337,7 +340,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 textInputAction: TextInputAction.search,
                 onSubmitted: (_) => _runLookup(),
                 decoration: InputDecoration(
-                  hintText: 'Search a word…',
+                  hintText: context.tr('Search a word…'),
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: _query.isEmpty
                       ? null
@@ -425,7 +428,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
           children: [
             CircularProgressIndicator(strokeWidth: 3),
             SizedBox(height: 14),
-            Text(
+            TrText(
               'Translating…',
               style: TextStyle(color: ZovaColors.textSecondary),
             ),
@@ -489,6 +492,7 @@ class _LanguagePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
@@ -503,7 +507,7 @@ class _LanguagePicker extends StatelessWidget {
           isExpanded: true,
           value: value,
           icon: const Icon(Icons.arrow_drop_down),
-          hint: Text(label),
+          hint: Text(context.tr(label)),
           items: [
             for (final language in kTranslationLanguages)
               DropdownMenuItem<TranslationLanguage>(
@@ -532,6 +536,7 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = live ? ZovaColors.success : ZovaColors.warning;
+    context.watch<UiTranslationController?>();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -539,7 +544,7 @@ class _StatusChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        label,
+        context.tr(label),
         style: TextStyle(
           color: color,
           fontSize: 11,
@@ -563,7 +568,7 @@ class _IdleHint extends StatelessWidget {
           children: [
             Icon(Icons.translate, color: ZovaColors.textSecondary, size: 44),
             SizedBox(height: 14),
-            Text(
+            TrText(
               'Type any word to translate it.',
               style: TextStyle(
                 fontSize: 16,
@@ -572,7 +577,7 @@ class _IdleHint extends StatelessWidget {
               ),
             ),
             SizedBox(height: 6),
-            Text(
+            TrText(
               'Results are cached on-device, so you can re-open recent '
               'lookups even offline.',
               textAlign: TextAlign.center,
@@ -612,7 +617,7 @@ class _WordOfDayCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    const TrText(
                       'Word of the day',
                       style: TextStyle(
                         fontSize: 13,
@@ -622,7 +627,7 @@ class _WordOfDayCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     if (loading)
-                      const Text(
+                      const TrText(
                         'Loading…',
                         style: TextStyle(
                           color: ZovaColors.textSecondary,
@@ -659,6 +664,7 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -683,7 +689,7 @@ class _ErrorState extends StatelessWidget {
                 foregroundColor: Colors.white,
               ),
               icon: const Icon(Icons.refresh, size: 18),
-              label: const Text('Try again'),
+              label: Text(context.tr('Try again')),
             ),
           ],
         ),
@@ -800,6 +806,7 @@ class EntryDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AppController>();
+    context.watch<UiTranslationController?>();
     final scope = context
         .read<LanguageController>()
         .settings
@@ -872,7 +879,7 @@ class EntryDetailScreen extends StatelessWidget {
             if (result.definition != null &&
                 result.definition!.isNotEmpty) ...[
               const SizedBox(height: 18),
-              const Text(
+              const TrText(
                 'Meaning',
                 style: TextStyle(
                   fontSize: 14,
@@ -893,7 +900,7 @@ class EntryDetailScreen extends StatelessWidget {
             ],
             if (result.alternates.isNotEmpty) ...[
               const SizedBox(height: 18),
-              const Text(
+              const TrText(
                 'Other translations',
                 style: TextStyle(
                   fontSize: 14,
@@ -948,8 +955,8 @@ class EntryDetailScreen extends StatelessWidget {
                         SnackBar(
                           content: Text(
                             isSaved
-                                ? 'Removed from My Words'
-                                : 'Saved to My Words',
+                                ? context.tr('Removed from My Words')
+                                : context.tr('Saved to My Words'),
                           ),
                         ),
                       );
@@ -958,7 +965,7 @@ class EntryDetailScreen extends StatelessWidget {
                       isSaved ? Icons.bookmark : Icons.bookmark_outline,
                       size: 20,
                     ),
-                    label: Text(isSaved ? 'Saved' : 'Save'),
+                    label: Text(context.tr(isSaved ? 'Saved' : 'Save')),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -973,20 +980,22 @@ class EntryDetailScreen extends StatelessWidget {
                         : () {
                             controller.addToLeitner(result.word);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Added to Leitner Box'),
+                              SnackBar(
+                                content: Text(context.tr('Added to Leitner Box')),
                               ),
                             );
                           },
                     icon: const Icon(Icons.style_outlined, size: 20),
-                    label: Text(inLeitner ? 'In Leitner' : 'Leitner'),
+                    label: Text(
+                      context.tr(inLeitner ? 'In Leitner' : 'Leitner'),
+                    ),
                   ),
                 ),
               ],
             ),
             if (result.example != null) ...[
               const SizedBox(height: 18),
-              const Text(
+              const TrText(
                 'Example',
                 style: TextStyle(
                   fontSize: 14,
@@ -1017,7 +1026,7 @@ class EntryDetailScreen extends StatelessWidget {
               ],
             ],
             const SizedBox(height: 24),
-            const Text(
+            const TrText(
               'Practice it',
               style: TextStyle(
                 fontSize: 14,
@@ -1026,7 +1035,7 @@ class EntryDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            const TrText(
               'Save this word to "My Words" or drop it into a Leitner box to '
               'review it with flashcards until you never forget it.',
               style: TextStyle(

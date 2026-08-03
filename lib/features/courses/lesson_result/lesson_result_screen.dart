@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../core/state/ui_translation_controller.dart';
 import '../../../core/theme/zova_colors.dart';
 import '../../../core/widgets/gradient_button.dart';
+import '../../../core/widgets/tr_text.dart';
 
 /// Celebratory screen shown after a lesson finishes.
 class LessonResultScreen extends StatelessWidget {
@@ -32,6 +35,7 @@ class LessonResultScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -72,7 +76,7 @@ class LessonResultScreen extends StatelessWidget {
                     children: [
                       Icon(Icons.bolt, color: ZovaColors.primary, size: 18),
                       SizedBox(width: 6),
-                      Text(
+                      TrText(
                         'Double XP boost active!',
                         style: TextStyle(
                           fontSize: 13,
@@ -88,14 +92,16 @@ class LessonResultScreen extends StatelessWidget {
               _RewardRow(
                 icon: Icons.bolt,
                 label: 'Experience',
-                value: '+$xp XP',
+                value: '+{0} XP',
+                args: [xp],
                 color: ZovaColors.primary,
               ),
               const SizedBox(height: 14),
               _RewardRow(
                 icon: Icons.style,
                 label: 'New words',
-                value: '$words',
+                value: '{0}',
+                args: [words],
                 color: ZovaColors.secondary,
               ),
               const SizedBox(height: 14),
@@ -107,7 +113,7 @@ class LessonResultScreen extends StatelessWidget {
               ),
               const Spacer(flex: 3),
               GradientButton(
-                label: 'Continue',
+                label: context.tr('Continue'),
                 icon: Icons.arrow_forward,
                 onPressed: () => Navigator.of(context).pop(),
               ),
@@ -126,12 +132,14 @@ class _RewardRow extends StatelessWidget {
     required this.label,
     required this.value,
     required this.color,
+    this.args = const [],
   });
 
   final IconData icon;
   final String label;
   final String value;
   final Color color;
+  final List<Object> args;
 
   @override
   Widget build(BuildContext context) {
@@ -148,7 +156,7 @@ class _RewardRow extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              label,
+              context.tr(label),
               style: const TextStyle(
                 color: ZovaColors.textSecondary,
                 fontWeight: FontWeight.w600,
@@ -156,7 +164,7 @@ class _RewardRow extends StatelessWidget {
             ),
           ),
           Text(
-            value,
+            value.contains('{') ? context.trTempl(value, args) : value,
             style: const TextStyle(
               color: ZovaColors.textPrimary,
               fontWeight: FontWeight.w800,

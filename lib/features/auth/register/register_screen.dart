@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/state/app_controller.dart';
+import '../../../core/state/ui_translation_controller.dart';
 import '../../../core/theme/zova_colors.dart';
 import '../../../core/widgets/gradient_button.dart';
+import '../../../core/widgets/tr_text.dart';
 
 /// New user registration. In demo mode the profile is stored locally;
 /// with Supabase configured the account is created under the operator's
@@ -56,6 +58,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final busy = context.watch<AppController>().busy;
+    context.watch<UiTranslationController?>();
 
     return Scaffold(
       body: SafeArea(
@@ -74,7 +77,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                const TrText(
                   'Create your account',
                   style: TextStyle(
                     fontSize: 28,
@@ -83,7 +86,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                const TrText(
                   'One account for all your progress.',
                   style: TextStyle(color: ZovaColors.textSecondary),
                 ),
@@ -91,9 +94,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextFormField(
                   controller: _nameController,
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Name (optional)',
-                    prefixIcon: Icon(Icons.person_outline),
+                  decoration: InputDecoration(
+                    labelText: context.tr('Name (optional)'),
+                    prefixIcon: const Icon(Icons.person_outline),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -102,13 +105,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   keyboardType: TextInputType.emailAddress,
                   autocorrect: false,
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.mail_outline),
+                  decoration: InputDecoration(
+                    labelText: context.tr('Email'),
+                    prefixIcon: const Icon(Icons.mail_outline),
                   ),
                   validator: (value) {
                     if (value == null || !value.contains('@')) {
-                      return 'Enter a valid email';
+                      return context.tr('Enter a valid email');
                     }
                     return null;
                   },
@@ -119,7 +122,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   obscureText: _obscure,
                   textInputAction: TextInputAction.next,
                   decoration: InputDecoration(
-                    labelText: 'Password',
+                    labelText: context.tr('Password'),
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -130,7 +133,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.length < 6) {
-                      return 'At least 6 characters';
+                      return context.tr('At least 6 characters');
                     }
                     return null;
                   },
@@ -141,13 +144,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   obscureText: _obscure,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _submit(),
-                  decoration: const InputDecoration(
-                    labelText: 'Confirm password',
-                    prefixIcon: Icon(Icons.lock_outline),
+                  decoration: InputDecoration(
+                    labelText: context.tr('Confirm password'),
+                    prefixIcon: const Icon(Icons.lock_outline),
                   ),
                   validator: (value) {
                     if (value != _passwordController.text) {
-                      return 'Passwords do not match';
+                      return context.tr('Passwords do not match');
                     }
                     return null;
                   },
@@ -161,12 +164,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ],
                 const SizedBox(height: 28),
                 GradientButton(
-                  label: 'Create account',
+                  label: context.tr('Create account'),
                   loading: busy,
                   onPressed: _submit,
                 ),
                 const SizedBox(height: 12),
-                Text(
+                TrText(
                   'By continuing you agree to the terms of zova.',
                   textAlign: TextAlign.center,
                   style: TextStyle(

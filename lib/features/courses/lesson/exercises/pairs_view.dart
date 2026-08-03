@@ -1,9 +1,12 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../../core/state/ui_translation_controller.dart';
 import '../../../../core/theme/zova_colors.dart';
 import '../../../../core/widgets/gradient_button.dart';
+import '../../../../core/widgets/tr_text.dart';
 import '../../../../data/models/exercise.dart';
 
 /// Matching game: pair each word with its translation.
@@ -67,6 +70,7 @@ class _PairsViewState extends State<PairsView> {
   @override
   Widget build(BuildContext context) {
     final allMatched = _finished;
+    context.watch<UiTranslationController?>();
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -81,7 +85,10 @@ class _PairsViewState extends State<PairsView> {
           ),
           const SizedBox(height: 16),
           Text(
-            '${_matched.length}/${widget.exercise.pairs.length} matched',
+            context.trTempl('{0}/{1} matched', [
+              _matched.length,
+              widget.exercise.pairs.length,
+            ]),
             style: const TextStyle(color: ZovaColors.textSecondary),
           ),
           const SizedBox(height: 16),
@@ -114,7 +121,7 @@ class _PairsViewState extends State<PairsView> {
           if (allMatched) ...[
             const SizedBox(height: 12),
             GradientButton(
-              label: 'Continue',
+              label: context.tr('Continue'),
               icon: Icons.arrow_forward,
               onPressed: () => widget.onDone(true),
             ),

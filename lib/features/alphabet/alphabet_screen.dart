@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/tr_text.dart';
 
 /// One letter of the English alphabet with its name, IPA and a model word.
 class _LetterData {
@@ -92,12 +93,12 @@ class AlphabetScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Alphabet & Pronunciation')),
+      appBar: AppBar(title: const TrText('Alphabet & Pronunciation')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
           children: [
-            const Text(
+            const TrText(
               'Learn the English alphabet',
               style: TextStyle(
                 fontSize: 26,
@@ -106,7 +107,7 @@ class AlphabetScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            const TrText(
               'Tap a letter to hear how it is written and see a model word.',
               style: TextStyle(color: ZovaColors.textSecondary, height: 1.4),
             ),
@@ -130,7 +131,7 @@ class AlphabetScreen extends StatelessWidget {
               },
             ),
             const SizedBox(height: 28),
-            const Text(
+            const TrText(
               'Sounds to master',
               style: TextStyle(
                 fontSize: 20,
@@ -139,7 +140,7 @@ class AlphabetScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            const TrText(
               'English sounds that Persian speakers often mix up.',
               style: TextStyle(color: ZovaColors.textSecondary),
             ),
@@ -206,7 +207,7 @@ class AlphabetScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'letter name · ${letter.ipa}',
+                        context.trTempl('letter name · {0}', [letter.ipa]),
                         style: const TextStyle(
                           fontSize: 15,
                           color: ZovaColors.secondary,
@@ -218,7 +219,7 @@ class AlphabetScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
-            const Text(
+            const TrText(
               'Example',
               style: TextStyle(
                 fontSize: 13,

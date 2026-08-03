@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../data/services/gamification_catalog.dart' as catalog;
 
 /// Achievements screen: the full badge catalog with earned slots highlighted
@@ -14,10 +16,11 @@ class BadgesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = context.watch<AppController>();
     final earned = controller.gamification.earnedBadges.toSet();
+    context.watch<UiTranslationController?>();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Badges', style: TextStyle(fontSize: 18)),
+        title: const TrText('Badges', style: TextStyle(fontSize: 18)),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -25,8 +28,10 @@ class BadgesScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
           children: [
             Text(
-              '${earned.length} of ${catalog.GamificationCatalog.badges.length} '
-              'badges earned',
+              context.trTempl('{0} of {1} badges earned', [
+                earned.length,
+                catalog.GamificationCatalog.badges.length,
+              ]),
               style: const TextStyle(color: ZovaColors.textSecondary),
             ),
             const SizedBox(height: 16),

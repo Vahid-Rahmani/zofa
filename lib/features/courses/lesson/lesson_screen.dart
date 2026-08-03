@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/state/app_controller.dart';
+import '../../../core/state/ui_translation_controller.dart';
 import '../../../core/theme/zova_colors.dart';
+import '../../../core/widgets/tr_text.dart';
 import '../../../data/models/exercise.dart';
 import '../../gamification/hearts_bar.dart';
 import 'exercises/article_view.dart';
@@ -85,16 +87,16 @@ class _LessonScreenState extends State<LessonScreen> {
     final shouldExit = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Leave lesson?'),
-        content: const Text('Your progress in this lesson will be lost.'),
+        title: Text(context.tr('Leave lesson?')),
+        content: Text(context.tr('Your progress in this lesson will be lost.')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep learning'),
+            child: Text(context.tr('Keep learning')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Leave'),
+            child: Text(context.tr('Leave')),
           ),
         ],
       ),
@@ -106,6 +108,7 @@ class _LessonScreenState extends State<LessonScreen> {
   Widget build(BuildContext context) {
     final exercise = _current;
     final progress = (_index + 1) / widget.lesson.exercises.length;
+    context.watch<UiTranslationController?>();
 
     return Scaffold(
       appBar: AppBar(

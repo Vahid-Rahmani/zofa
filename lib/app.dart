@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'core/config/env_config.dart';
 import 'core/state/app_controller.dart';
 import 'core/state/language_controller.dart';
+import 'core/state/ui_translation_controller.dart';
 import 'core/theme/zova_theme.dart';
 import 'features/auth/auth_gate.dart';
 import 'features/home/home_shell.dart';
@@ -17,19 +18,57 @@ class ZovaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final language = context.watch<LanguageController>();
-    return MaterialApp(
-      title: EnvConfig.appName,
-      debugShowCheckedModeBanner: false,
-      theme: ZovaTheme.dark,
-      locale: Locale(language.settings.uiLanguage.code),
-      builder: (context, child) => Directionality(
-        textDirection:
-            language.isRtlUi ? TextDirection.rtl : TextDirection.ltr,
-        child: child ?? const SizedBox.shrink(),
+    return UiLanguageSync(
+      child: MaterialApp(
+        title: EnvConfig.appName,
+        debugShowCheckedModeBanner: false,
+        theme: ZovaTheme.dark,
+        locale: Locale(language.settings.uiLanguageCode),
+        builder: (context, child) => Directionality(
+          textDirection:
+              language.isRtlUi ? TextDirection.rtl : TextDirection.ltr,
+          child: child ?? const SizedBox.shrink(),
+        ),
+        home: const SessionGate(),
       ),
-      home: const SessionGate(),
     );
   }
+}
+
+/// Keeps the [UiTranslationController] target in sync with the chosen native
+/// language so the whole interface re-translates live.
+class UiLanguageSync extends StatefulWidget {
+  const UiLanguageSync({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<UiLanguageSync> createState() => _UiLanguageSyncState();
+}
+
+class _UiLanguageSyncState extends State<UiLanguageSync> {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(covariant UiLanguageSync oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _sync();
+  }
+
+  void _sync() {
+    final language = context.watch<LanguageController>();
+    final ui = context.read<UiTranslationController?>();
+    if (ui == null) return;
+    final code = language.settings.uiLanguageCode;
+    if (ui.code != code) ui.setCode(code);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 /// Routes the user through splash -> onboarding -> auth -> home.

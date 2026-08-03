@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/tr_text.dart';
 import '../courses/courses_screen.dart';
 import '../dictionary/dictionary_screen.dart';
 import '../profile/profile_screen.dart';
@@ -35,6 +38,7 @@ class _HomeShellBodyState extends State<_HomeShellBody> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Scaffold(
       body: IndexedStack(index: _index, children: _tabs),
       bottomNavigationBar: NavigationBar(
@@ -50,26 +54,26 @@ class _HomeShellBodyState extends State<_HomeShellBody> {
             fontWeight: FontWeight.w600,
           );
         }),
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
+            icon: const Icon(Icons.home_outlined),
+            selectedIcon: const Icon(Icons.home),
+            label: context.tr('Home'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.map_outlined),
-            selectedIcon: Icon(Icons.map),
-            label: 'Courses',
+            icon: const Icon(Icons.map_outlined),
+            selectedIcon: const Icon(Icons.map),
+            label: context.tr('Courses'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.translate),
-            selectedIcon: Icon(Icons.translate),
-            label: 'Dictionary',
+            icon: const Icon(Icons.translate),
+            selectedIcon: const Icon(Icons.translate),
+            label: context.tr('Dictionary'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
+            icon: const Icon(Icons.person_outline),
+            selectedIcon: const Icon(Icons.person),
+            label: context.tr('Profile'),
           ),
         ],
       ),

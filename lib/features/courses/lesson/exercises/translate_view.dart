@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../../core/state/ui_translation_controller.dart';
 import '../../../../core/theme/zova_colors.dart';
 import '../../../../core/widgets/gradient_button.dart';
+import '../../../../core/widgets/tr_text.dart';
 import '../../../../data/models/exercise.dart';
 
 /// Typing exercise: enter the translation of the shown word.
@@ -38,14 +41,17 @@ class _TranslateViewState extends State<TranslateView> {
     setState(() {
       _isCorrect = correct;
       _resultMessage = correct
-          ? 'Correct!'
-          : 'The answer is "${widget.exercise.correctAnswer}".';
+          ? context.tr('Correct!')
+          : context.trTempl('The answer is "{0}".', [
+              widget.exercise.correctAnswer ?? '',
+            ]);
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final answered = _isCorrect != null;
+    context.watch<UiTranslationController?>();
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -68,8 +74,8 @@ class _TranslateViewState extends State<TranslateView> {
             enabled: !answered,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _check(),
-            decoration: const InputDecoration(
-              labelText: 'Type the translation',
+            decoration: InputDecoration(
+              labelText: context.tr('Type the translation'),
               hintText: 'e.g. سلام',
             ),
           ),
@@ -87,13 +93,13 @@ class _TranslateViewState extends State<TranslateView> {
           const SizedBox(height: 16),
           if (!answered)
             GradientButton(
-              label: 'Check',
+              label: context.tr('Check'),
               icon: Icons.check,
               onPressed: _check,
             )
           else
             GradientButton(
-              label: 'Continue',
+              label: context.tr('Continue'),
               icon: Icons.arrow_forward,
               onPressed: () => widget.onDone(_isCorrect!),
             ),

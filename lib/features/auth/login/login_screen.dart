@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/state/app_controller.dart';
+import '../../../core/state/ui_translation_controller.dart';
 import '../../../core/theme/zova_colors.dart';
 import '../../../core/widgets/gradient_button.dart';
+import '../../../core/widgets/tr_text.dart';
 import '../../../core/widgets/zova_logo.dart';
 
 /// Email + password sign in.
@@ -48,6 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final busy = context.watch<AppController>().busy;
+    context.watch<UiTranslationController?>();
 
     return Scaffold(
       body: SafeArea(
@@ -61,7 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 16),
                 const Center(child: ZovaLogo(size: 72)),
                 const SizedBox(height: 40),
-                const Text(
+                const TrText(
                   'Welcome back',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -71,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                const TrText(
                   'Sign in to continue your streak.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: ZovaColors.textSecondary),
@@ -82,13 +85,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   keyboardType: TextInputType.emailAddress,
                   autocorrect: false,
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.mail_outline),
+                  decoration: InputDecoration(
+                    labelText: context.tr('Email'),
+                    prefixIcon: const Icon(Icons.mail_outline),
                   ),
                   validator: (value) {
                     if (value == null || !value.contains('@')) {
-                      return 'Enter a valid email';
+                      return context.tr('Enter a valid email');
                     }
                     return null;
                   },
@@ -100,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _submit(),
                   decoration: InputDecoration(
-                    labelText: 'Password',
+                    labelText: context.tr('Password'),
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -111,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.length < 6) {
-                      return 'At least 6 characters';
+                      return context.tr('At least 6 characters');
                     }
                     return null;
                   },
@@ -125,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
                 const SizedBox(height: 28),
                 GradientButton(
-                  label: 'Sign in',
+                  label: context.tr('Sign in'),
                   loading: busy,
                   onPressed: _submit,
                 ),
@@ -133,13 +136,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
+                    const TrText(
                       'New to zova?',
                       style: TextStyle(color: ZovaColors.textSecondary),
                     ),
                     TextButton(
                       onPressed: busy ? null : widget.onRegister,
-                      child: const Text('Create account'),
+                      child: const TrText('Create account'),
                     ),
                   ],
                 ),

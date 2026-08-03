@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../../core/state/ui_translation_controller.dart';
 import '../../../../core/theme/zova_colors.dart';
 import '../../../../core/widgets/gradient_button.dart';
+import '../../../../core/widgets/tr_text.dart';
 import '../../../../data/models/exercise.dart';
 
 /// German article quiz: pick the grammatical article (`der`/`die`/`das`) for
@@ -36,6 +39,7 @@ class _ArticleViewState extends State<ArticleView> {
   Widget build(BuildContext context) {
     final options = List<String>.from(widget.exercise.options)
       ..sort();
+    context.watch<UiTranslationController?>();
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -45,7 +49,7 @@ class _ArticleViewState extends State<ArticleView> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
+                  const TrText(
                     'Which article does this noun take?',
                     textAlign: TextAlign.center,
                     style: TextStyle(
@@ -79,7 +83,7 @@ class _ArticleViewState extends State<ArticleView> {
           const SizedBox(height: 8),
           if (_answered)
             GradientButton(
-              label: 'Continue',
+              label: context.tr('Continue'),
               icon: Icons.arrow_forward,
               onPressed: () => widget.onDone(_isCorrect),
             ),

@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
 import '../../core/state/language_controller.dart';
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../data/models/app_user.dart';
 import '../../data/models/course.dart';
 import '../../data/models/translation_language.dart';
@@ -67,8 +69,7 @@ class HomeScreen extends StatelessWidget {
             const _SectionHeader(
               title: 'Learn',
               subtitle: 'Choose how you want to study today',
-            ),
-            const SizedBox(height: 14),
+            ),            const SizedBox(height: 14),
             _FeatureGrid(
               onVocabulary: () => onNavigateToTab(2),
               onListeningReading: () =>
@@ -120,7 +121,7 @@ class HomeScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            const TrText(
               'Follow zova',
               style: TextStyle(
                 fontSize: 18,
@@ -129,7 +130,7 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            const TrText(
               'Learn tips and new words every day.',
               style: TextStyle(color: ZovaColors.textSecondary),
             ),
@@ -164,7 +165,10 @@ class HomeScreen extends StatelessWidget {
                   if (!context.mounted) return;
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Copied $handle to clipboard')),
+                    SnackBar(
+                      content:
+                          Text(context.trTempl('Copied {0} to clipboard', [handle])),
+                    ),
                   );
                 },
               ),
@@ -205,6 +209,7 @@ class _GreetingHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Row(
       children: [
         CircleAvatar(
@@ -218,7 +223,7 @@ class _GreetingHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Hi, $_firstName 👋',
+                context.trTempl('Hi, {0} 👋', [_firstName]),
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 22,
@@ -228,7 +233,8 @@ class _GreetingHeader extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                'Learning $learningLanguageName · keep it up!',
+                context.trTempl('Learning {0} · keep it up!',
+                    [learningLanguageName]),
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: ZovaColors.textSecondary),
               ),
@@ -294,6 +300,7 @@ class _ContinueCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     final languageCode = context
         .watch<LanguageController>()
         .settings
@@ -328,7 +335,7 @@ class _ContinueCard extends StatelessWidget {
                 children: [
                   Icon(Icons.rocket_launch, color: Colors.white, size: 22),
                   SizedBox(width: 8),
-                  Text(
+                  TrText(
                     'Continue learning',
                     style: TextStyle(
                       color: Colors.white,
@@ -339,9 +346,10 @@ class _ContinueCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
-              Text(
+              TrText(
                 hasCourse
-                    ? '$completed of $total lessons completed'
+                    ? context.trTempl('{0} of {1} lessons completed',
+                        ['$completed', '$total'])
                     : 'A full course for this language is coming soon.',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
@@ -375,7 +383,7 @@ class _ContinueCard extends StatelessWidget {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
+                      TrText(
                         'Go to Courses',
                         style: TextStyle(fontWeight: FontWeight.w800),
                       ),
@@ -422,7 +430,7 @@ class _GamificationSection extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    TrText(
                       'Hearts',
                       style: TextStyle(
                         fontSize: 14,
@@ -430,7 +438,7 @@ class _GamificationSection extends StatelessWidget {
                         color: ZovaColors.textPrimary,
                       ),
                     ),
-                    Text(
+                    TrText(
                       'Mistakes cost a heart; one refills every 30 min.',
                       style: TextStyle(
                         fontSize: 12,
@@ -507,7 +515,7 @@ class _GamificationTile extends StatelessWidget {
             children: [
               Icon(icon, color: color, size: 24),
               const SizedBox(height: 6),
-              Text(
+              TrText(
                 label,
                 style: const TextStyle(
                   fontSize: 13,
@@ -534,7 +542,7 @@ class _SectionHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        TrText(
           title,
           style: const TextStyle(
             fontSize: 20,
@@ -543,7 +551,7 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 2),
-        Text(
+        TrText(
           subtitle,
           style: const TextStyle(color: ZovaColors.textSecondary),
         ),
@@ -578,28 +586,24 @@ class _FeatureGrid extends StatelessWidget {
         _FeatureCard(
           icon: Icons.translate,
           title: 'Vocabulary',
-          faTitle: 'واژه‌آموزی',
           colors: const [ZovaColors.primary, ZovaColors.primaryDark],
           onTap: onVocabulary,
         ),
         _FeatureCard(
           icon: Icons.headphones,
           title: 'Listening & Reading',
-          faTitle: 'خواندن و شنیدن',
           colors: const [ZovaColors.secondary, Color(0xFF2B8FD0)],
           onTap: onListeningReading,
         ),
         _FeatureCard(
           icon: Icons.abc,
           title: 'Alphabet & Pronunciation',
-          faTitle: 'الفبا و تلفظ',
           colors: const [ZovaColors.warning, Color(0xFFD99A26)],
           onTap: onAlphabet,
         ),
         _FeatureCard(
           icon: Icons.fact_check,
           title: 'Grammar',
-          faTitle: 'گرامر',
           colors: const [ZovaColors.success, Color(0xFF1F9A58)],
           onTap: onGrammar,
         ),
@@ -612,14 +616,12 @@ class _FeatureCard extends StatelessWidget {
   const _FeatureCard({
     required this.icon,
     required this.title,
-    required this.faTitle,
     required this.colors,
     required this.onTap,
   });
 
   final IconData icon;
   final String title;
-  final String faTitle;
   final List<Color> colors;
   final VoidCallback onTap;
 
@@ -651,7 +653,7 @@ class _FeatureCard extends StatelessWidget {
                 child: Icon(icon, color: Colors.white, size: 24),
               ),
               const Spacer(),
-              Text(
+              TrText(
                 title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -659,15 +661,6 @@ class _FeatureCard extends StatelessWidget {
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                   color: ZovaColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                faTitle,
-                textDirection: TextDirection.rtl,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: ZovaColors.textSecondary,
                 ),
               ),
             ],
@@ -704,28 +697,24 @@ class _QuickAccessGrid extends StatelessWidget {
         _QuickTile(
           icon: Icons.style,
           title: 'Leitner Box',
-          faTitle: 'لایتنر',
           color: ZovaColors.primary,
           onTap: onLeitner,
         ),
         _QuickTile(
           icon: Icons.bookmark,
           title: 'My Words',
-          faTitle: 'کلمات شما',
           color: ZovaColors.success,
           onTap: onMyWords,
         ),
         _QuickTile(
           icon: Icons.storefront,
           title: 'Shop',
-          faTitle: 'فروشگاه',
           color: ZovaColors.warning,
           onTap: onShop,
         ),
         _QuickTile(
           icon: Icons.share,
           title: 'Social',
-          faTitle: 'شبکه‌ها',
           color: ZovaColors.secondary,
           onTap: onSocial,
         ),
@@ -738,14 +727,12 @@ class _QuickTile extends StatelessWidget {
   const _QuickTile({
     required this.icon,
     required this.title,
-    required this.faTitle,
     required this.color,
     required this.onTap,
   });
 
   final IconData icon;
   final String title;
-  final String faTitle;
   final Color color;
   final VoidCallback onTap;
 
@@ -777,7 +764,7 @@ class _QuickTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
+                    TrText(
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -785,16 +772,6 @@ class _QuickTile extends StatelessWidget {
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                         color: ZovaColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      faTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: ZovaColors.textSecondary,
                       ),
                     ),
                   ],

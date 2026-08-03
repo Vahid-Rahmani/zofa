@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../data/models/gamification_state.dart';
 
 /// A compact hearts indicator bound to [AppController.hearts].
@@ -20,6 +22,7 @@ class HeartsBar extends StatelessWidget {
     final controller = context.watch<AppController>();
     final hearts = controller.hearts;
     final full = hearts >= GamificationState.maxHearts;
+    context.watch<UiTranslationController?>();
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -46,7 +49,7 @@ class HeartsBar extends StatelessWidget {
         if (!full) ...[
           const SizedBox(width: 8),
           Text(
-            'refills in ${_refillHint(controller)}',
+            context.trTempl('refills in {0}', [_refillHint(controller)]),
             style: const TextStyle(
               fontSize: 11,
               color: ZovaColors.textSecondary,

@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
 import '../../core/state/language_controller.dart';
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../data/models/course.dart';
 import '../../data/models/translation_language.dart';
 import '../../data/services/seed_content.dart';
@@ -32,6 +34,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
         .watch<LanguageController>()
         .settings
         .learningLanguage;
+    context.watch<UiTranslationController?>();
     return FutureBuilder<Course?>(
       future: SeedContent.courseFor(languageCode),
       builder: (context, snapshot) {
@@ -41,11 +44,11 @@ class _CoursesScreenState extends State<CoursesScreen> {
           );
         }
         if (snapshot.hasError) {
-          return const Scaffold(
+          return Scaffold(
             body: Center(
               child: Text(
-                "Couldn't load the course. Please try again.",
-                style: TextStyle(color: ZovaColors.textSecondary),
+                context.tr("Couldn't load the course. Please try again."),
+                style: const TextStyle(color: ZovaColors.textSecondary),
               ),
             ),
           );
@@ -139,6 +142,7 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progress = total == 0 ? 0.0 : completed / total;
+    context.watch<UiTranslationController?>();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
@@ -152,7 +156,7 @@ class _Header extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Learn $language',
+                      context.trTempl('Learn {0}', [language]),
                       style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
@@ -160,7 +164,7 @@ class _Header extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
+                    const TrText(
                       'Small steps, every day.',
                       style: TextStyle(color: ZovaColors.textSecondary),
                     ),
@@ -195,7 +199,7 @@ class _Header extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  const TrText(
                     'Roadmap',
                     style: TextStyle(
                       color: Colors.white,
@@ -205,7 +209,10 @@ class _Header extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '$completed of $total lessons completed',
+                    context.trTempl('{0} of {1} lessons completed', [
+                      completed,
+                      total,
+                    ]),
                     style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 13,
@@ -287,6 +294,7 @@ class _LevelSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final done =
         entries.where((e) => completedIds.contains(e.lesson.id)).length;
+    context.watch<UiTranslationController?>();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
@@ -312,7 +320,9 @@ class _LevelSection extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       level.description.isEmpty
-                          ? '${level.lessons.length} lessons'
+                          ? context.trTempl('{0} lessons', [
+                              level.lessons.length,
+                            ])
                           : level.description,
                       style: const TextStyle(color: ZovaColors.textSecondary),
                     ),
@@ -324,7 +334,10 @@ class _LevelSection extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '$done of ${entries.length} lessons done',
+            context.trTempl('{0} of {1} lessons done', [
+              done,
+              entries.length,
+            ]),
             style: const TextStyle(
               color: ZovaColors.textSecondary,
               fontSize: 13,
@@ -398,6 +411,7 @@ class _LessonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Card(
       child: ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -416,10 +430,12 @@ class _LessonCard extends StatelessWidget {
         ),
         subtitle: Text(
           isCompleted
-              ? 'Completed'
+              ? context.tr('Completed')
               : isLocked
-                  ? 'Locked'
-                  : '${lesson.exercises.length} exercises',
+                  ? context.tr('Locked')
+                  : context.trTempl('{0} exercises', [
+                      lesson.exercises.length,
+                    ]),
           style: TextStyle(
             color: isLocked
                 ? ZovaColors.textSecondary.withValues(alpha: 0.5)
@@ -457,6 +473,7 @@ class _ComingSoon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = TranslationLanguage.byCode(languageCode)?.name ?? languageCode;
+    context.watch<UiTranslationController?>();
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -468,7 +485,7 @@ class _ComingSoon extends StatelessWidget {
                 const Text('🚧', style: TextStyle(fontSize: 48)),
                 const SizedBox(height: 16),
                 Text(
-                  '$name course coming soon',
+                  context.trTempl('{0} course coming soon', [name]),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 22,
@@ -478,8 +495,11 @@ class _ComingSoon extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'The dictionary, flashcards and reviews already work for '
-                  '$name. A full structured course is on the way.',
+                  context.trTempl(
+                    'The dictionary, flashcards and reviews already work for '
+                    '{0}. A full structured course is on the way.',
+                    [name],
+                  ),
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: ZovaColors.textSecondary),
                 ),

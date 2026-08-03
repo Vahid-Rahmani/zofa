@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
+import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/tr_text.dart';
 import '../../data/services/gamification_catalog.dart';
 
 /// Daily quests screen: the three Duolingo-style daily goals with live
@@ -14,17 +16,18 @@ class QuestsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = context.watch<AppController>();
     final gamification = controller.gamification;
+    context.watch<UiTranslationController?>();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Daily Quests', style: TextStyle(fontSize: 18)),
+        title: const TrText('Daily Quests', style: TextStyle(fontSize: 18)),
         centerTitle: true,
       ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
           children: [
-            const Text(
+            const TrText(
               'Complete goals today to earn bonus XP.',
               style: TextStyle(color: ZovaColors.textSecondary),
             ),
@@ -40,11 +43,11 @@ class QuestsScreen extends StatelessWidget {
               const SizedBox(height: 12),
             ],
             const SizedBox(height: 8),
-            Text(
+            const TrText(
               'Quests reset every day at midnight.',
               style: TextStyle(
                 fontSize: 12,
-                color: ZovaColors.textSecondary.withValues(alpha: 0.8),
+                color: ZovaColors.textSecondary,
               ),
             ),
           ],
@@ -71,6 +74,7 @@ class _QuestTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final complete = progress >= quest.target;
     final ratio = (progress / quest.target).clamp(0.0, 1.0);
+    context.watch<UiTranslationController?>();
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -124,7 +128,7 @@ class _QuestTile extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   claimed
-                      ? 'Reward claimed ✓'
+                      ? context.tr('Reward claimed ✓')
                       : '$progress / ${quest.target}',
                   style: const TextStyle(
                     fontSize: 12,
