@@ -12,6 +12,7 @@ class LessonResultScreen extends StatelessWidget {
     required this.total,
     required this.xp,
     required this.words,
+    this.boosted = false,
   });
 
   final String lessonTitle;
@@ -19,6 +20,7 @@ class LessonResultScreen extends StatelessWidget {
   final int total;
   final int xp;
   final int words;
+  final bool boosted;
 
   int get _stars => total == 0
       ? 0
@@ -57,6 +59,32 @@ class LessonResultScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 28),
+              if (boosted) ...[
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: ZovaColors.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.bolt, color: ZovaColors.primary, size: 18),
+                      SizedBox(width: 6),
+                      Text(
+                        'Double XP boost active!',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: ZovaColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
               _RewardRow(
                 icon: Icons.bolt,
                 label: 'Experience',

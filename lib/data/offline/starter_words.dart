@@ -58,6 +58,31 @@ const Map<String, Map<String, List<String>>> kStarterWords = {
       'umsetzen', 'einschränken', 'präzisieren', 'unterschätzen', 'überwinden',
     ],
   },
+  'es': {
+    'A1': [
+      'hola', 'adiós', 'por favor', 'gracias', 'agua', 'pan', 'manzana',
+      'casa', 'amigo', 'familia', 'madre', 'padre', 'libro', 'escuela',
+      'profesor', 'mañana', 'noche', 'uno', 'dos', 'tres',
+    ],
+    'A2': [
+      'tiempo', 'viaje', 'estación', 'billete', 'hotel', 'restaurante',
+      'verdura', 'cocina', 'jardín', 'calle', 'mercado', 'barato',
+      'caro', 'temprano', 'tarde', 'feliz', 'triste', 'ocupado', 'libre',
+      'cansado',
+    ],
+    'B1': [
+      'medio ambiente', 'educación', 'gobierno', 'salud', 'enfermedad',
+      'relación', 'descubrir', 'mejorar', 'tener éxito', 'aconsejar',
+      'negarse', 'organizar', 'comparar', 'decidir', 'depender', 'lograr',
+      'promedio', 'seguro', 'curioso', 'orgulloso',
+    ],
+    'B2': [
+      'perspectiva', 'consecuencia', 'polémica', 'compromiso', 'estrategia',
+      'supuesto', 'significativo', 'inevitable', 'ambiguo', 'coherente',
+      'negociar', 'contradecir', 'reconocer', 'demostrar', 'socavar',
+      'implementar', 'restringir', 'especificar', 'subestimar', 'superar',
+    ],
+  },
 };
 
 /// The CEFR levels that have starter words.

@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
+import '../../core/state/language_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../data/models/app_user.dart';
+import '../../data/models/translation_language.dart';
 import '../../data/models/user_progress.dart';
+import '../../data/services/gamification_catalog.dart';
+import '../gamification/badges_screen.dart';
+import '../gamification/league_screen.dart';
 import '../settings/language_settings_screen.dart';
 import '../subscription/paywall_screen.dart';
 
@@ -17,6 +22,15 @@ class ProfileScreen extends StatelessWidget {
     final controller = context.watch<AppController>();
     final user = controller.user;
     final progress = controller.progress;
+    final language = context.watch<LanguageController>().settings;
+    final nativeName =
+        TranslationLanguage.byCode(language.nativeLanguage)?.name ??
+            language.nativeLanguage;
+    final learningName =
+        TranslationLanguage.byCode(language.learningLanguage)?.name ??
+            language.learningLanguage;
+    final lessonsCompleted =
+        progress.completedLessonsFor(language.learningLanguage).length;
 
     if (user == null) return const SizedBox.shrink();
 
@@ -48,7 +62,7 @@ class ProfileScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${user.nativeLanguage} → ${user.learnedLanguage}',
+                        '$nativeName → $learningName',
                         style: const TextStyle(color: ZovaColors.textSecondary),
                       ),
                     ],
@@ -57,7 +71,35 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
-            _StatsGrid(progress: progress),
+            _StatsGrid(progress: progress, lessonsCompleted: lessonsCompleted),
+            const SizedBox(height: 24),
+            _LeagueCard(
+              tier: controller.league.tier,
+              position: controller.league.playerPosition,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const LeagueScreen(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+            _BadgesCard(
+              earnedCount: controller.gamification.earnedBadges.length,
+              totalCount: GamificationCatalog.badges.length,
+              earnedIcons: GamificationCatalog.badges
+                  .where((b) => controller.gamification.earnedBadges.contains(b.id))
+                  .map((b) => b.icon)
+                  .toList(),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const BadgesScreen(),
+                  ),
+                );
+              },
+            ),
             const SizedBox(height: 24),
             _PremiumCard(
               active: progress.subscriptionActive,
@@ -84,9 +126,10 @@ class ProfileScreen extends StatelessWidget {
 }
 
 class _StatsGrid extends StatelessWidget {
-  const _StatsGrid({required this.progress});
+  const _StatsGrid({required this.progress, required this.lessonsCompleted});
 
   final UserProgress progress;
+  final int lessonsCompleted;
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +137,7 @@ class _StatsGrid extends StatelessWidget {
       ('XP', '${progress.xp}', Icons.bolt, ZovaColors.primary),
       ('Streak', '${progress.streakDays}', Icons.local_fire_department, ZovaColors.warning),
       ('Words', '${progress.wordsLearned}', Icons.style, ZovaColors.secondary),
-      ('Lessons', '${progress.completedLessonIds.length}', Icons.school, ZovaColors.success),
+      ('Lessons', '$lessonsCompleted', Icons.school, ZovaColors.success),
     ];
 
     return GridView.count(
@@ -134,6 +177,139 @@ class _StatsGrid extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _LeagueCard extends StatelessWidget {
+  const _LeagueCard({
+    required this.tier,
+    required this.position,
+    required this.onTap,
+  });
+
+  final String tier;
+  final int position;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: ZovaColors.surface,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              const Icon(Icons.emoji_events,
+                  color: ZovaColors.warning, size: 28),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$tier league',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: ZovaColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'You are #$position this week',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: ZovaColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right,
+                  color: ZovaColors.textSecondary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BadgesCard extends StatelessWidget {
+  const _BadgesCard({
+    required this.earnedCount,
+    required this.totalCount,
+    required this.earnedIcons,
+    required this.onTap,
+  });
+
+  final int earnedCount;
+  final int totalCount;
+  final List<String> earnedIcons;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: ZovaColors.surface,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              const Icon(Icons.military_tech,
+                  color: ZovaColors.warning, size: 28),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$earnedCount of $totalCount badges',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: ZovaColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        for (final icon in earnedIcons.take(5))
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Text(icon,
+                                style: const TextStyle(fontSize: 18)),
+                          ),
+                        if (earnedIcons.isEmpty)
+                          const Text(
+                            'Complete lessons, build streaks and grow your '
+                            'vocabulary to earn badges.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: ZovaColors.textSecondary,
+                              height: 1.4,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right,
+                  color: ZovaColors.textSecondary),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

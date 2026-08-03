@@ -18,9 +18,9 @@ class MyWordsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AppController>();
-    final savedWords = controller.progress.savedWords;
-    final languageCode =
-        context.watch<LanguageController>().settings.translationLanguage.code;
+    final settings = context.watch<LanguageController>().settings;
+    final savedWords = controller.progress.savedWordsFor(settings.learningLanguage);
+    final languageCode = settings.nativeLanguage;
 
     return Scaffold(
       appBar: AppBar(title: const Text('My Words')),
@@ -28,6 +28,7 @@ class MyWordsScreen extends StatelessWidget {
         child: _SavedWordsList(
           key: ValueKey(savedWords),
           words: savedWords,
+          wordsScope: settings.learningLanguage,
           languageCode: languageCode,
           controller: controller,
         ),
@@ -40,11 +41,16 @@ class _SavedWordsList extends StatefulWidget {
   const _SavedWordsList({
     super.key,
     required this.words,
+    required this.wordsScope,
     required this.languageCode,
     required this.controller,
   });
 
   final List<String> words;
+
+  /// Learning-language scope the saved words belong to (used to check Leitner
+  /// membership in the same scope).
+  final String wordsScope;
   final String languageCode;
   final AppController controller;
 
@@ -157,7 +163,8 @@ class _SavedWordsListState extends State<_SavedWordsList> {
           for (final entry in entries) ...[
             _WordCard(
               entry: entry,
-              inLeitner: widget.controller.progress.leitnerBoxes
+              inLeitner: widget.controller.progress
+                  .leitnerBoxesFor(widget.wordsScope)
                   .containsKey(entry.word),
               onRetry: () => _resolveWord(entry.word),
               onAddToLeitner: () {

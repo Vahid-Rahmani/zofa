@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,7 @@ import 'package:zova/core/state/language_controller.dart';
 import 'package:zova/data/models/language_settings.dart';
 import 'package:zova/data/models/translation_language.dart';
 import 'package:zova/data/models/translation_result.dart';
+import 'package:zova/data/services/german_frequency.dart';
 import 'package:zova/data/services/translation_backend.dart';
 import 'package:zova/data/services/translation_cache.dart';
 import 'package:zova/data/services/translation_service.dart';
@@ -40,6 +42,13 @@ void main() {
       cache: MemoryTranslationCache(),
     );
     TranslationService.instance = service;
+  });
+
+  setUpAll(() async {
+    GermanFrequencyList.seedAsset(
+      GermanFrequencyList.assetPath,
+      await File('assets/dictionary/german_top_50k.json').readAsString(),
+    );
   });
 
   tearDown(() {
@@ -210,5 +219,50 @@ void main() {
     // The pickers followed the smart flip: From فارسی, To English.
     expect(find.text('فارسی (fa)'), findsOneWidget);
     expect(find.text('English (en)'), findsOneWidget);
+  });
+
+  testWidgets('German source shows the word of the day', (tester) async {
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) => LanguageController(
+              initial: const LanguageSettings(learningLanguage: 'de'),
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: DictionaryScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final list = await GermanFrequencyList.service;
+    final expected = list.wordOfDay(DateTime.now());
+
+    expect(find.text('Word of the day'), findsOneWidget);
+    expect(find.text(expected), findsOneWidget);
+  });
+
+  testWidgets('German source autocompletes from the bundled 50k list',
+      (tester) async {
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) => LanguageController(
+              initial: const LanguageSettings(learningLanguage: 'de'),
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: DictionaryScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'hallo');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ActionChip), findsWidgets);
+    expect(find.widgetWithText(ActionChip, 'hallo'), findsOneWidget);
   });
 }

@@ -71,6 +71,13 @@ void main() {
     expect(find.text('Courses'), findsOneWidget);
     expect(find.text('Dictionary'), findsOneWidget);
     expect(find.text('Profile'), findsOneWidget);
+
+    // The Learn grid sits below the fold; scroll it into view.
+    await tester.scrollUntilVisible(
+      find.text('Vocabulary'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Vocabulary'), findsOneWidget);
     expect(find.text('Listening & Reading'), findsOneWidget);
     expect(find.text('Grammar'), findsOneWidget);

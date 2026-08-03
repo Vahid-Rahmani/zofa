@@ -2,13 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
+import '../../core/state/language_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../data/models/course.dart';
+import '../../data/models/translation_language.dart';
 import '../../data/services/seed_content.dart';
 import 'lesson/lesson_screen.dart';
 
 /// The Courses tab: shows the roadmap with levels and lessons plus the
 /// user's streak and daily progress.
+///
+/// The roadmap follows the active learning language from [LanguageController]
+/// and rebuilds when the language pair changes. Languages without a bundled
+/// course (e.g. Spanish) get an honest "coming soon" state.
 ///
 /// Lessons unlock sequentially across the whole roadmap: a lesson is playable
 /// only when the previous lesson in the flat course order is completed.
@@ -20,26 +26,46 @@ class CoursesScreen extends StatefulWidget {
 }
 
 class _CoursesScreenState extends State<CoursesScreen> {
-  late final Future<Course> _course = SeedContent.englishCourse();
-
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Course>(
-      future: _course,
+    final languageCode = context
+        .watch<LanguageController>()
+        .settings
+        .learningLanguage;
+    return FutureBuilder<Course?>(
+      future: SeedContent.courseFor(languageCode),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+        if (snapshot.connectionState != ConnectionState.done) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        return _buildRoadmap(context, snapshot.data!);
+        if (snapshot.hasError) {
+          return const Scaffold(
+            body: Center(
+              child: Text(
+                "Couldn't load the course. Please try again.",
+                style: TextStyle(color: ZovaColors.textSecondary),
+              ),
+            ),
+          );
+        }
+        final course = snapshot.data;
+        if (course == null) {
+          return _ComingSoon(languageCode: languageCode);
+        }
+        return _buildRoadmap(context, course);
       },
     );
   }
 
   Widget _buildRoadmap(BuildContext context, Course course) {
     final controller = context.watch<AppController>();
-    final completedIds = controller.progress.completedLessonIds;
+    final languageCode = context
+        .read<LanguageController>()
+        .settings
+        .learningLanguage;
+    final completedIds = controller.progress.completedLessonsFor(languageCode);
 
     final roadmap = <_RoadmapEntry>[];
     for (final level in course.levels) {
@@ -417,6 +443,50 @@ class _LessonCard extends StatelessWidget {
                   ),
                 );
               },
+      ),
+    );
+  }
+}
+
+/// Shown when the active learning language has no bundled roadmap course yet.
+class _ComingSoon extends StatelessWidget {
+  const _ComingSoon({required this.languageCode});
+
+  final String languageCode;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = TranslationLanguage.byCode(languageCode)?.name ?? languageCode;
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('🚧', style: TextStyle(fontSize: 48)),
+                const SizedBox(height: 16),
+                Text(
+                  '$name course coming soon',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: ZovaColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'The dictionary, flashcards and reviews already work for '
+                  '$name. A full structured course is on the way.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: ZovaColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -5,6 +5,7 @@ import '../../core/state/app_controller.dart';
 import '../../core/state/language_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../data/models/translation_result.dart';
+import '../gamification/hearts_bar.dart';
 
 /// Flashcard review session for one Leitner box.
 ///
@@ -58,6 +59,12 @@ class _LeitnerReviewScreenState extends State<LeitnerReviewScreen> {
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: Center(child: HeartsBar()),
+          ),
+        ],
       ),
       body: SafeArea(
         child: _isDone
@@ -214,7 +221,7 @@ class _Flashcard extends StatelessWidget {
 
   Widget _meaning(BuildContext context) {
     final code =
-        context.watch<LanguageController>().settings.translationLanguage.code;
+        context.watch<LanguageController>().settings.nativeLanguage;
     final rtl = entry.isRtl || code == 'fa';
     return SingleChildScrollView(
       key: const ValueKey('meaning'),

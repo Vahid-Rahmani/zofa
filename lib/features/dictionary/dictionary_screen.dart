@@ -8,6 +8,7 @@ import '../../core/state/language_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../data/models/translation_language.dart';
 import '../../data/models/translation_result.dart';
+import '../../data/services/german_frequency.dart';
 import '../../data/services/translation_service.dart';
 
 /// The Dictionary tab: a live, dynamic translation lookup.
@@ -39,30 +40,99 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   TranslationException? _error;
   bool _loading = false;
 
+  /// Autocomplete candidates from the bundled 50k German word list.
+  List<String> _suggestions = const [];
+  bool _suggestionsLoading = false;
+
+  /// The deterministic "word of the day" from the 50k list.
+  String? _wordOfDay;
+  bool _wordOfDayLoading = false;
+
   /// Monotonic token so stale async responses never paint over newer ones.
   int _requestId = 0;
+
+  late final LanguageController _language;
 
   @override
   void initState() {
     super.initState();
-    final settings = context.read<LanguageController>().settings;
-    final native = TranslationLanguage.byCode(settings.nativeLanguage);
-    final learning = TranslationLanguage.byCode(settings.learningLanguage);
-    _source = learning ?? _english;
-    _target = native ?? _persian;
-    if (_target == _source) _target = _otherOf(_source);
+    _language = context.read<LanguageController>();
+    _language.addListener(_syncPairToSettings);
+    _syncPairToSettings();
   }
 
   @override
   void dispose() {
+    _language.removeListener(_syncPairToSettings);
     _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
+  /// Re-anchors the From/To pickers to the saved native ↔ learning pair.
+  ///
+  /// Listens to [LanguageController] so switching the language pair while the
+  /// tab stays alive in the `IndexedStack` updates the defaults immediately —
+  /// no restart needed. A manual override to an arbitrary pair is preserved
+  /// until the pair itself changes.
+  void _syncPairToSettings() {
+    if (!mounted) return;
+    final settings = context.read<LanguageController>().settings;
+    final native = TranslationLanguage.byCode(settings.nativeLanguage);
+    final learning = TranslationLanguage.byCode(settings.learningLanguage);
+    setState(() {
+      _source = learning ?? _english;
+      _target = native ?? _persian;
+      if (_target == _source) _target = _otherOf(_source);
+    });
+    _refreshGermanContext();
+    if (_query.isNotEmpty) _runLookup();
+  }
+
+  /// Loads the German 50k context (word of the day + autocomplete source) only
+  /// when German is the active source language, so non-German pairs never pay
+  /// for the 50k asset.
+  void _refreshGermanContext() {
+    if (_source.code != 'de') {
+      setState(() {
+        _suggestions = const [];
+        _wordOfDay = null;
+      });
+      return;
+    }
+    _loadWordOfDay();
+    _refreshSuggestions(_query);
+  }
+
+  Future<void> _loadWordOfDay() async {
+    if (_wordOfDay != null) return;
+    setState(() => _wordOfDayLoading = true);
+    final list = await GermanFrequencyList.service;
+    if (!mounted) return;
+    setState(() {
+      _wordOfDay = list.wordOfDay(DateTime.now());
+      _wordOfDayLoading = false;
+    });
+  }
+
+  Future<void> _refreshSuggestions(String query) async {
+    if (_source.code != 'de' || query.trim().isEmpty) {
+      if (_suggestions.isNotEmpty) setState(() => _suggestions = const []);
+      return;
+    }
+    setState(() => _suggestionsLoading = true);
+    final list = await GermanFrequencyList.service;
+    if (!mounted) return;
+    setState(() {
+      _suggestions = list.suggestions(query, limit: 6);
+      _suggestionsLoading = false;
+    });
+  }
+
   void _onSearchChanged(String value) {
     setState(() => _query = value);
     _maybeSmartFlip(value);
+    _refreshSuggestions(value);
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), _runLookup);
   }
@@ -118,7 +188,22 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _result = null;
       _error = null;
       _loading = false;
+      _suggestions = const [];
     });
+  }
+
+  /// Fills the search field from an autocomplete or word-of-the-day tap and
+  /// runs the live lookup immediately.
+  void _pickSuggestion(String word) {
+    _debounce?.cancel();
+    _requestId++;
+    _searchController.text = word;
+    _searchController.selection = TextSelection.collapsed(offset: word.length);
+    setState(() {
+      _query = word;
+      _suggestions = const [];
+    });
+    _runLookup();
   }
 
   void _changeSource(TranslationLanguage language) {
@@ -126,6 +211,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
       _source = language;
       if (_source == _target) _target = _otherOf(language);
     });
+    _refreshGermanContext();
     if (_query.isNotEmpty) _runLookup();
   }
 
@@ -269,6 +355,43 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
               ),
             ),
             const SizedBox(height: 12),
+            if (_source.code == 'de' &&
+                (_suggestions.isNotEmpty || _suggestionsLoading)) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final word in _suggestions)
+                      ActionChip(
+                        avatar: const Icon(
+                          Icons.bolt,
+                          size: 16,
+                          color: ZovaColors.primary,
+                        ),
+                        label: Text(word),
+                        labelStyle: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: ZovaColors.textPrimary,
+                        ),
+                        backgroundColor: ZovaColors.surface,
+                        side: BorderSide(
+                          color: ZovaColors.primary.withValues(alpha: 0.25),
+                        ),
+                        onPressed: () => _pickSuggestion(word),
+                      ),
+                    if (_suggestionsLoading)
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             Expanded(child: _buildResultArea()),
           ],
         ),
@@ -278,7 +401,22 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
 
   Widget _buildResultArea() {
     if (_query.isEmpty) {
-      return const _IdleHint();
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+        children: [
+          const _IdleHint(),
+          if (_source.code == 'de') ...[
+            const SizedBox(height: 16),
+            _WordOfDayCard(
+              word: _wordOfDay,
+              loading: _wordOfDayLoading,
+              onTap: _wordOfDay == null
+                  ? null
+                  : () => _pickSuggestion(_wordOfDay!),
+            ),
+          ],
+        ],
+      );
     }
     if (_loading) {
       return const Center(
@@ -447,6 +585,72 @@ class _IdleHint extends StatelessWidget {
   }
 }
 
+class _WordOfDayCard extends StatelessWidget {
+  const _WordOfDayCard({
+    required this.word,
+    required this.loading,
+    this.onTap,
+  });
+
+  final String? word;
+  final bool loading;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              const Icon(Icons.celebration, color: ZovaColors.primary, size: 32),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Word of the day',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: ZovaColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (loading)
+                      const Text(
+                        'Loading…',
+                        style: TextStyle(
+                          color: ZovaColors.textSecondary,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      )
+                    else if (word != null)
+                      Text(
+                        word!,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: ZovaColors.textPrimary,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (onTap != null)
+                const Icon(Icons.chevron_right, color: ZovaColors.textSecondary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ErrorState extends StatelessWidget {
   const _ErrorState({required this.message, required this.onRetry});
 
@@ -596,8 +800,13 @@ class EntryDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AppController>();
-    final isSaved = controller.progress.savedWords.contains(result.word);
-    final inLeitner = controller.progress.leitnerBoxes.containsKey(result.word);
+    final scope = context
+        .read<LanguageController>()
+        .settings
+        .learningLanguage;
+    final isSaved = controller.progress.savedWordsFor(scope).contains(result.word);
+    final inLeitner = controller.progress.leitnerBoxesFor(scope)
+        .containsKey(result.word);
     final rtl = result.isRtl;
 
     return Scaffold(

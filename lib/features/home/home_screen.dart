@@ -3,12 +3,18 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/state/app_controller.dart';
+import '../../core/state/language_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../data/models/app_user.dart';
 import '../../data/models/course.dart';
+import '../../data/models/translation_language.dart';
 import '../../data/services/seed_content.dart';
 import '../alphabet/alphabet_screen.dart';
 import '../books/books_screen.dart';
+import '../gamification/badges_screen.dart';
+import '../gamification/hearts_bar.dart';
+import '../gamification/league_screen.dart';
+import '../gamification/quests_screen.dart';
 import '../grammar/grammar_screen.dart';
 import '../leitner/leitner_screen.dart';
 import '../mywords/my_words_screen.dart';
@@ -31,6 +37,13 @@ class HomeScreen extends StatelessWidget {
     final user = controller.user;
     if (user == null) return const SizedBox.shrink();
 
+    final languageCode = context
+        .watch<LanguageController>()
+        .settings
+        .learningLanguage;
+    final languageName =
+        TranslationLanguage.byCode(languageCode)?.name ?? languageCode;
+
     return Scaffold(
       body: SafeArea(
         child: ListView(
@@ -38,11 +51,18 @@ class HomeScreen extends StatelessWidget {
           children: [
             _GreetingHeader(
               user: user,
+              learningLanguageName: languageName,
               streak: controller.progress.streakDays,
               xp: controller.progress.xp,
             ),
             const SizedBox(height: 20),
             _ContinueCard(onGoToCourses: () => onNavigateToTab(1)),
+            const SizedBox(height: 20),
+            _GamificationSection(
+              onQuests: () => _push(context, const QuestsScreen()),
+              onLeague: () => _push(context, const LeagueScreen()),
+              onBadges: () => _push(context, const BadgesScreen()),
+            ),
             const SizedBox(height: 28),
             const _SectionHeader(
               title: 'Learn',
@@ -161,11 +181,16 @@ class HomeScreen extends StatelessWidget {
 class _GreetingHeader extends StatelessWidget {
   const _GreetingHeader({
     required this.user,
+    required this.learningLanguageName,
     required this.streak,
     required this.xp,
   });
 
   final AppUser user;
+
+  /// Name of the language currently being learned (driven by the active
+  /// language pair, not by the profile snapshot).
+  final String learningLanguageName;
   final int streak;
   final int xp;
 
@@ -203,7 +228,7 @@ class _GreetingHeader extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                'Learning ${user.learnedLanguage} · keep it up!',
+                'Learning $learningLanguageName · keep it up!',
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: ZovaColors.textSecondary),
               ),
@@ -269,12 +294,21 @@ class _ContinueCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Course>(
-      future: SeedContent.englishCourse(),
+    final languageCode = context
+        .watch<LanguageController>()
+        .settings
+        .learningLanguage;
+    return FutureBuilder<Course?>(
+      future: SeedContent.courseFor(languageCode),
       builder: (context, snapshot) {
-        final total = snapshot.data?.totalLessons ?? 0;
-        final completed =
-            context.watch<AppController>().progress.completedLessonIds.length;
+        final course = snapshot.data;
+        final hasCourse = course != null;
+        final total = course?.totalLessons ?? 0;
+        final completed = context
+            .watch<AppController>()
+            .progress
+            .completedLessonsFor(languageCode)
+            .length;
         final progress = total == 0 ? 0.0 : completed / total;
 
         return Container(
@@ -306,22 +340,24 @@ class _ContinueCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                total == 0
-                    ? 'Keep your streak alive — one lesson today.'
-                    : '$completed of $total lessons completed',
+                hasCourse
+                    ? '$completed of $total lessons completed'
+                    : 'A full course for this language is coming soon.',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 10,
-                  backgroundColor: Colors.white24,
-                  valueColor:
-                      const AlwaysStoppedAnimation<Color>(Colors.white),
+              if (hasCourse) ...[
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 10,
+                    backgroundColor: Colors.white24,
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
                 ),
-              ),
+              ],
               const SizedBox(height: 14),
               Align(
                 alignment: Alignment.centerRight,
@@ -353,6 +389,136 @@ class _ContinueCard extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _GamificationSection extends StatelessWidget {
+  const _GamificationSection({
+    required this.onQuests,
+    required this.onLeague,
+    required this.onBadges,
+  });
+
+  final VoidCallback onQuests;
+  final VoidCallback onLeague;
+  final VoidCallback onBadges;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: ZovaColors.surface,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: const Row(
+            children: [
+              Text('❤️', style: TextStyle(fontSize: 22)),
+              SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hearts',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: ZovaColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Mistakes cost a heart; one refills every 30 min.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: ZovaColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              HeartsBar(showCount: true),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _GamificationTile(
+                icon: Icons.checklist,
+                color: ZovaColors.success,
+                label: 'Quests',
+                onTap: onQuests,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _GamificationTile(
+                icon: Icons.emoji_events,
+                color: ZovaColors.warning,
+                label: 'League',
+                onTap: onLeague,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _GamificationTile(
+                icon: Icons.military_tech,
+                color: ZovaColors.secondary,
+                label: 'Badges',
+                onTap: onBadges,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _GamificationTile extends StatelessWidget {
+  const _GamificationTile({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: ZovaColors.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 24),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: ZovaColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

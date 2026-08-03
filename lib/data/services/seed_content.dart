@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
 import '../models/book.dart';
 import '../models/course.dart';
 import '../models/dictionary_entry.dart';
@@ -13,8 +15,10 @@ import 'dictionary_service.dart';
 /// lessons are generated from the bundled master datasets so vocabulary,
 /// examples and proficiency levels (A1/A2/B1) stay in one place, and every
 /// exercise is translation-free (built from words + example sentences), which
-/// makes lessons work offline and for any native language. Each book ships
-/// with a curated Persian translation for bilingual reading.
+/// makes lessons work offline and for any native language. The English and
+/// German master datasets each produce a roadmap course; [courseFor] picks the
+/// active one from the learner's current language pair. Each book ships with a
+/// curated Persian translation for bilingual reading.
 ///
 /// All models are JSON-serialisable, so this content can later move to the
 /// backend and be fetched per course without touching the UI.
@@ -36,18 +40,48 @@ abstract final class SeedContent {
   // Course
   // ---------------------------------------------------------------------------
 
-  /// Builds the English roadmap course. Lessons and their exercises are
-  /// generated from the bundled [Dictionary.service], so the JSON dictionary
-  /// stays the single source of truth for vocabulary. Memoised so the Home
-  /// dashboard and the Courses tab share one loaded course.
-  static Future<Course>? _englishCourseCache;
+  /// Builds the roadmap course for [languageCode]. The bundled master datasets
+  /// ship English and German, so those two produce a full course; any other
+  /// learning language returns `null` and the UI shows an honest "coming soon"
+  /// state (the dynamic dictionary and Leitner layers still work for any pair).
+  ///
+  /// Memoised per language so the Home dashboard and the Courses tab share one
+  /// loaded course, and so switching the learning language swaps content
+  /// reactively instead of rebuilding from scratch.
+  static final Map<String, Future<Course>> _courses = {};
 
   static Future<Course> englishCourse() =>
-      _englishCourseCache ??= _loadEnglishCourse();
+      _courses['en'] ??= _loadEnglishCourse();
+
+  static Future<Course> germanCourse() =>
+      _courses['de'] ??= _loadGermanCourse();
+
+  /// Clears the memoised course cache. Test-only hook: widget tests run under
+  /// a fake async clock, so a course future completed in a previous (real
+  /// async) test would never deliver its result to a [FutureBuilder]. Resetting
+  /// lets the widget test load the course afresh inside its own zone.
+  @visibleForTesting
+  static void resetCourses() => _courses.clear();
+
+  static Future<Course?> courseFor(String languageCode) {
+    switch (languageCode) {
+      case 'en':
+        return englishCourse();
+      case 'de':
+        return germanCourse();
+      default:
+        return Future.value(null);
+    }
+  }
 
   static Future<Course> _loadEnglishCourse() async {
     final dict = await Dictionary.service;
     return _essentialEnglish(dict);
+  }
+
+  static Future<Course> _loadGermanCourse() async {
+    final dict = await GermanDictionary.service;
+    return _essentialGerman(dict);
   }
 
   static Course _essentialEnglish(DictionaryService dict) {
@@ -334,6 +368,80 @@ abstract final class SeedContent {
       ),
     ],
   );
+  }
+
+  static Course _essentialGerman(DictionaryService dict) {
+    return Course(
+      id: 'course_german_essential',
+      title: 'Essential German',
+      description:
+          'A complete roadmap: Foundations (A1), Everyday German (A2) and '
+          'Confident German (B1), with hundreds of words, real examples and '
+          'interactive exercises.',
+      color: 0xFFDD3B2E,
+      language: 'German',
+      nativeLanguage: 'Persian',
+      icon: '🇩🇪',
+      levels: [
+        CourseLevel(
+          id: 'level_de_a1_foundations',
+          title: 'Foundations',
+          level: 'A1',
+          icon: '🌱',
+          description: 'Begrüßungen, Zahlen, Familie und die nützlichsten Wörter.',
+          lessons: [
+            _lesson(dict: dict, id: 'lesson_de_a1_greetings', title: 'Begrüßungen', icon: '👋', level: 'A1', topics: ['greetings']),
+            _lesson(dict: dict, id: 'lesson_de_a1_introductions', title: 'Vorstellungen', icon: '🤝', level: 'A1', topics: ['introductions', 'polite']),
+            _lesson(dict: dict, id: 'lesson_de_a1_numbers_days', title: 'Zahlen & Tage', icon: '🔢', level: 'A1', topics: ['numbers', 'days', 'time']),
+            _lesson(dict: dict, id: 'lesson_de_a1_family_people', title: 'Familie & Menschen', icon: '👨‍👩‍👧', level: 'A1', topics: ['family', 'people']),
+            _lesson(dict: dict, id: 'lesson_de_a1_home_objects', title: 'Zuhause & Gegenstände', icon: '🏠', level: 'A1', topics: ['home', 'objects']),
+            _lesson(dict: dict, id: 'lesson_de_a1_food_drinks', title: 'Essen & Trinken', icon: '🍎', level: 'A1', topics: ['food', 'drinks']),
+            _lesson(dict: dict, id: 'lesson_de_a1_colors', title: 'Farben & Beschreibungen', icon: '🎨', level: 'A1', topics: ['colors', 'descriptions']),
+            _lesson(dict: dict, id: 'lesson_de_a1_verbs', title: 'Alltagsverben', icon: '🏃', level: 'A1', topics: ['verbs']),
+            _lesson(dict: dict, id: 'lesson_de_a1_routine', title: 'Der Tagesablauf', icon: '⏰', level: 'A1', topics: ['routine', 'time']),
+            _lesson(dict: dict, id: 'lesson_de_a1_clothes', title: 'Kleidung', icon: '👗', level: 'A1', topics: ['clothes']),
+          ],
+        ),
+        CourseLevel(
+          id: 'level_de_a2_everyday',
+          title: 'Everyday German',
+          level: 'A2',
+          icon: '🚶',
+          description: 'Einkaufen, Reisen, Gesundheit, Arbeit und das Alltagsdeutsch.',
+          lessons: [
+            _lesson(dict: dict, id: 'lesson_de_a2_shopping', title: 'Einkaufen & Geld', icon: '🛍️', level: 'A2', topics: ['shopping', 'money']),
+            _lesson(dict: dict, id: 'lesson_de_a2_travel', title: 'Reisen & Wege', icon: '✈️', level: 'A2', topics: ['travel', 'directions']),
+            _lesson(dict: dict, id: 'lesson_de_a2_weather', title: 'Wetter & Jahreszeiten', icon: '🌦️', level: 'A2', topics: ['weather', 'seasons']),
+            _lesson(dict: dict, id: 'lesson_de_a2_health', title: 'Gesundheit & Körper', icon: '❤️', level: 'A2', topics: ['health', 'body']),
+            _lesson(dict: dict, id: 'lesson_de_a2_hobbies', title: 'Hobbys & Freizeit', icon: '🎨', level: 'A2', topics: ['hobbies']),
+            _lesson(dict: dict, id: 'lesson_de_a2_jobs', title: 'Arbeit & Berufe', icon: '💼', level: 'A2', topics: ['jobs']),
+            _lesson(dict: dict, id: 'lesson_de_a2_restaurant', title: 'Im Restaurant', icon: '🍽️', level: 'A2', topics: ['restaurant']),
+            _lesson(dict: dict, id: 'lesson_de_a2_emotions', title: 'Gefühle & Emotionen', icon: '😊', level: 'A2', topics: ['emotions']),
+            _lesson(dict: dict, id: 'lesson_de_a2_animals', title: 'Tiere & Natur', icon: '🐾', level: 'A2', topics: ['animals', 'nature']),
+            _lesson(dict: dict, id: 'lesson_de_a2_places', title: 'In der Stadt', icon: '🏙️', level: 'A2', topics: ['places']),
+          ],
+        ),
+        CourseLevel(
+          id: 'level_de_b1_confident',
+          title: 'Confident German',
+          level: 'B1',
+          icon: '🚀',
+          description: 'Karriere, Studium, Meinungen und Fähigkeiten für echte Gespräche.',
+          lessons: [
+            _lesson(dict: dict, id: 'lesson_de_b1_career', title: 'Karriere & Arbeitsplatz', icon: '📈', level: 'B1', topics: ['career']),
+            _lesson(dict: dict, id: 'lesson_de_b1_education', title: 'Bildung & Studium', icon: '🎓', level: 'B1', topics: ['education']),
+            _lesson(dict: dict, id: 'lesson_de_b1_media', title: 'Medien & Nachrichten', icon: '📰', level: 'B1', topics: ['media']),
+            _lesson(dict: dict, id: 'lesson_de_b1_relationships', title: 'Beziehungen & Sozialleben', icon: '💞', level: 'B1', topics: ['relationships']),
+            _lesson(dict: dict, id: 'lesson_de_b1_opinions', title: 'Meinungen & Debatten', icon: '💭', level: 'B1', topics: ['opinions']),
+            _lesson(dict: dict, id: 'lesson_de_b1_lifestyle', title: 'Gesundheit & Lebensstil', icon: '🌿', level: 'B1', topics: ['lifestyle']),
+            _lesson(dict: dict, id: 'lesson_de_b1_technology', title: 'Technologie & Internet', icon: '💻', level: 'B1', topics: ['technology']),
+            _lesson(dict: dict, id: 'lesson_de_b1_goals', title: 'Zukunftspläne & Ziele', icon: '🎯', level: 'B1', topics: ['goals']),
+            _lesson(dict: dict, id: 'lesson_de_b1_finance', title: 'Geld & Finanzen', icon: '💳', level: 'B1', topics: ['finance', 'money']),
+            _lesson(dict: dict, id: 'lesson_de_b1_culture', title: 'Reisen & Kultur', icon: '🌍', level: 'B1', topics: ['culture', 'travel']),
+          ],
+        ),
+      ],
+    );
   }
 
   /// Builds one lesson from the dictionary entries that match [level] and any

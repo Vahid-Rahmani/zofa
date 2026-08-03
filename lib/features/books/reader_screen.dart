@@ -51,11 +51,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Future<void> _showWordSheet(String word) async {
-    final languageCode = context
-        .read<LanguageController>()
-        .settings
-        .translationLanguage
-        .code;
+    final languageCode =
+        context.read<LanguageController>().settings.nativeLanguage;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: ZovaColors.surfaceRaised,

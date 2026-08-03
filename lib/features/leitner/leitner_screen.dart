@@ -47,11 +47,12 @@ class _LeitnerBoxScreenState extends State<LeitnerBoxScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final controller = context.read<AppController>();
-    final languageCode =
-        context.read<LanguageController>().settings.translationLanguage.code;
+    final settings = context.read<LanguageController>().settings;
+    final scope = settings.learningLanguage;
+    final target = settings.nativeLanguage;
     _resolved.clear();
-    for (final word in controller.progress.leitnerBoxes.keys) {
-      await _resolve(word, languageCode);
+    for (final word in controller.progress.leitnerBoxesFor(scope).keys) {
+      await _resolve(word, target);
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -82,12 +83,16 @@ class _LeitnerBoxScreenState extends State<LeitnerBoxScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AppController>();
-    final boxes = controller.progress.leitnerBoxes;
+    final scope = context
+        .read<LanguageController>()
+        .settings
+        .learningLanguage;
+    final boxes = controller.progress.leitnerBoxesFor(scope);
     final total = boxes.length;
     final now = DateTime.now();
     final dueByBox = <int, int>{1: 0, 2: 0, 3: 0, 4: 0, 5: 0};
     var dueToday = 0;
-    for (final state in controller.progress.learning.values) {
+    for (final state in controller.progress.learningFor(scope).values) {
       if (state.isDueAt(now)) {
         dueToday++;
         dueByBox[state.box] = (dueByBox[state.box] ?? 0) + 1;
@@ -195,20 +200,25 @@ class _WordPoolCardState extends State<_WordPoolCard> {
   @override
   void initState() {
     super.initState();
+    final learning =
+        context.read<LanguageController>().settings.learningLanguage;
+    _source = kStarterWords.containsKey(learning) ? learning : 'en';
     _computePool();
   }
 
   Future<void> _computePool({bool reseed = false}) async {
     if (reseed) _seed++;
     setState(() => _loading = true);
-    final inBox = widget.controller.progress.leitnerBoxes;
+    final scope =
+        context.read<LanguageController>().settings.learningLanguage;
+    final inBox = widget.controller.progress.leitnerBoxesFor(scope);
     final candidates = starterWordsFor(_source, _level)
         .where((word) => !inBox.containsKey(word))
         .toList()
       ..shuffle(Random(_seed));
 
     final languageCode =
-        context.read<LanguageController>().settings.translationLanguage.code;
+        context.read<LanguageController>().settings.nativeLanguage;
     final resolved = <_PoolWord>[];
     for (final word in candidates.take(_shown)) {
       String? translation;
@@ -443,7 +453,7 @@ class _WordPoolCardState extends State<_WordPoolCard> {
 
   bool _isRtlTarget() =>
       TranslationLanguage.byCode(
-            context.read<LanguageController>().settings.translationLanguage.code,
+            context.read<LanguageController>().settings.nativeLanguage,
           )?.isRtl ??
       false;
 }

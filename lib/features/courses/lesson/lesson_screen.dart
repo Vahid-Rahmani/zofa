@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/state/app_controller.dart';
 import '../../../core/theme/zova_colors.dart';
 import '../../../data/models/exercise.dart';
+import '../../gamification/hearts_bar.dart';
 import 'exercises/article_view.dart';
 import 'exercises/choose_answer_view.dart';
 import 'exercises/flashcard_view.dart';
@@ -36,7 +37,11 @@ class _LessonScreenState extends State<LessonScreen> {
   Exercise get _current => widget.lesson.exercises[_index];
 
   void _handleResult({required bool correct}) {
-    if (correct) _correct++;
+    if (correct) {
+      _correct++;
+    } else {
+      context.read<AppController>().consumeHeart();
+    }
     if (_index < widget.lesson.exercises.length - 1) {
       setState(() => _index++);
     } else {
@@ -53,6 +58,7 @@ class _LessonScreenState extends State<LessonScreen> {
     final xp = 10 * widget.lesson.exercises.length + _correct * 5;
 
     final controller = context.read<AppController>();
+    final boosted = controller.boostActive;
     await controller.completeLesson(
       lessonId: widget.lesson.id,
       xpEarned: xp,
@@ -67,8 +73,9 @@ class _LessonScreenState extends State<LessonScreen> {
           lessonTitle: widget.lesson.title,
           correct: _correct,
           total: widget.lesson.exercises.length,
-          xp: xp,
+          xp: boosted ? xp * 2 : xp,
           words: words,
+          boosted: boosted,
         ),
       ),
     );
@@ -111,6 +118,12 @@ class _LessonScreenState extends State<LessonScreen> {
           style: const TextStyle(fontSize: 16),
         ),
         centerTitle: true,
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: Center(child: HeartsBar()),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
