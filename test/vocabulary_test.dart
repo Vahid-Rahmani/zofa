@@ -212,45 +212,49 @@ void main() {
       );
     }
 
-    testWidgets('lists the words of the level grouped by part of speech',
-        (tester) async {
+    testWidgets('opens on the level themes and drills into one', (tester) async {
       await tester.pumpWidget(wrap(const LevelWordsScreen(level: 'A1')));
       await tester.pumpAndSettle();
 
+      // The screen opens on the level header and its themed category cards.
       expect(find.text('A1 · Beginner'), findsOneWidget);
-      expect(find.text('1000 words'), findsOneWidget);
-
-      // Words are grouped into part-of-speech sections with counts.
+      expect(find.textContaining('1000 words'), findsOneWidget);
       expect(find.text('Verbs'), findsOneWidget);
+      expect(find.text('Food & Drinks'), findsOneWidget);
+
+      // Opening a theme shows only that theme's words, with rank badges.
+      await tester.tap(find.text('Food & Drinks'));
+      await tester.pumpAndSettle();
+      expect(find.text('apple'), findsOneWidget);
+      expect(find.text('#50'), findsOneWidget);
+      expect(find.text('be'), findsNothing);
+
+      // Back returns to the category grid.
+      await tester.tap(find.byIcon(Icons.arrow_back));
+      await tester.pumpAndSettle();
+      expect(find.text('A1 · Beginner'), findsOneWidget);
+
+      // Verb words carry their part of speech as the badge.
+      await tester.tap(find.text('Verbs'));
+      await tester.pumpAndSettle();
       expect(find.text('be'), findsOneWidget);
       expect(find.text('#6'), findsOneWidget);
-      expect(find.text('Nouns'), findsOneWidget);
-      expect(find.text('apple'), findsOneWidget);
-      expect(find.text('Adverbs'), findsOneWidget);
-      expect(find.text('quickly'), findsOneWidget);
 
-      // Ranks further down the level list render lazily; scroll to one.
-      await tester.scrollUntilVisible(
-        find.text('happy'),
-        2000,
-        scrollable: find.byType(Scrollable).last,
-      );
-      expect(find.text('happy'), findsOneWidget);
-      expect(find.text('#500'), findsOneWidget);
-      expect(find.text('Adjectives'), findsOneWidget);
-
-      // The untagged words land in the trailing "Other words" section.
-      await tester.scrollUntilVisible(
-        find.text('you'),
-        -200,
-        scrollable: find.byType(Scrollable).last,
-      );
+      // Untagged function words land in the trailing "Other words" theme.
+      await tester.tap(find.byIcon(Icons.arrow_back));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Other words'));
+      await tester.pumpAndSettle();
       expect(find.text('you'), findsOneWidget);
       expect(find.text('#1'), findsOneWidget);
     });
 
-    testWidgets('filter narrows the level list', (tester) async {
+    testWidgets('filter narrows the words of a theme', (tester) async {
       await tester.pumpWidget(wrap(const LevelWordsScreen(level: 'B1')));
+      await tester.pumpAndSettle();
+
+      // 'good' is B1's adjective; the adjective theme holds it.
+      await tester.tap(find.text('Adjectives'));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), 'good');

@@ -1,19 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/state/app_controller.dart';
+import '../../core/state/language_controller.dart';
 import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
-import '../../core/widgets/content_text.dart';
 import '../../core/widgets/tr_text.dart';
+import '../../core/widgets/vocabulary_card.dart';
 import '../../data/services/english_frequency.dart';
 import '../../data/services/english_grammar.dart';
+import 'vocabulary_themes.dart';
 import 'word_study_screen.dart';
 
-/// All the words in one CEFR level (e.g. `B1`), lazily rendered so levels with
-/// tens of thousands of words stay fast. Words are grouped into part-of-speech
-/// sections (Verbs, Nouns, Adjectives, Adverbs, Other words). Every word is
-/// live-translated into the learner's native (first) language; tapping it opens
-/// the dictionary-style [WordStudyScreen], which shows verb forms and examples.
+/// All the words in one CEFR level (e.g. `B1`), organised into themed
+/// categories (Food & Drinks, Travel, Family, ...) with part-of-speech
+/// fallback buckets (Verbs, Nouns, ...).
+///
+/// The level opens on a Duolingo-style grid of category cards — icon, word
+/// count and a "learned" progress bar. Tapping a card drills into that single
+/// theme's words (each word belongs to exactly one category), rendered lazily
+/// so levels with tens of thousands of words stay fast. Every word is
+/// live-translated into the learner's native language; tapping it opens the
+/// dictionary-style [WordStudyScreen].
 class LevelWordsScreen extends StatefulWidget {
   const LevelWordsScreen({super.key, required this.level});
 
@@ -26,6 +34,9 @@ class LevelWordsScreen extends StatefulWidget {
 class _LevelWordsScreenState extends State<LevelWordsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+
+  /// The opened category, or `null` while showing the category grid.
+  VocabularyCategory? _selected;
 
   /// Created once so the [FutureBuilder] below resubscribes to the same
   /// completed future instead of an infinite stream of fresh futures.
@@ -41,21 +52,53 @@ class _LevelWordsScreenState extends State<LevelWordsScreen> {
   void _openWord(String word, int? rank) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => WordStudyScreen(word: word, level: widget.level, rank: rank),
+        builder: (_) => WordStudyScreen(
+          word: word,
+          level: widget.level,
+          rank: rank,
+        ),
       ),
     );
+  }
+
+  void _selectCategory(VocabularyCategory category) {
+    setState(() {
+      _selected = category;
+      _query = '';
+      _searchController.clear();
+    });
+  }
+
+  void _backToCategories() {
+    setState(() {
+      _selected = null;
+      _query = '';
+      _searchController.clear();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     context.watch<UiTranslationController?>();
+    final selected = _selected;
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          context.tr('${widget.level} · ${_levelLabel(widget.level)}'),
+          context.tr(
+            selected == null
+                ? '${widget.level} · ${_levelLabel(widget.level)}'
+                : selected.title,
+          ),
           style: const TextStyle(fontSize: 18),
         ),
         centerTitle: true,
+        leading: selected == null
+            ? null
+            : IconButton(
+                tooltip: context.tr('All categories'),
+                onPressed: _backToCategories,
+                icon: const Icon(Icons.arrow_back),
+              ),
       ),
       body: SafeArea(
         child: FutureBuilder<(EnglishFrequencyList, EnglishGrammar)>(
@@ -70,74 +113,43 @@ class _LevelWordsScreenState extends State<LevelWordsScreen> {
             final list = snapshot.data!.$1;
             final grammar = snapshot.data!.$2;
             final words = list.wordsForLevel(widget.level);
-            final query = _query.trim().toLowerCase();
-            final visible = query.isEmpty
-                ? words
-                : words.where((w) => w.contains(query)).toList(growable: false);
+            final scope =
+                context.read<LanguageController>().settings.learningLanguage;
+            final progress = context.watch<AppController>().progress;
+            final learned = <String>{
+              ...progress.savedWordsFor(scope),
+              ...progress.learningFor(scope).keys,
+            };
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 4),
-                  child: Text(
-                    context.trTempl('{0} words', [words.length]),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: ZovaColors.textSecondary,
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (value) => setState(() => _query = value),
-                    decoration: InputDecoration(
-                      hintText: context.tr('Filter words…'),
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _query.isEmpty
-                          ? null
-                          : IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() => _query = '');
-                              },
-                            ),
-                      filled: true,
-                      fillColor: ZovaColors.surface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: visible.isEmpty
-                      ? Center(
-                          child: Text(
-                            _query.isEmpty
-                                ? context.tr('No words in this level yet.')
-                                : context.trTempl(
-                                    'No words match "{0}".', [_query]),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: ZovaColors.textSecondary,
-                            ),
-                          ),
-                        )
-                      : _GroupedWordList(
-                          visible: visible,
-                          grammar: grammar,
-                          rankOf: list.rankOf,
-                          showRanks: query.isEmpty,
-                          onWordTap: _openWord,
-                        ),
-                ),
-              ],
+            final selected = _selected;
+            if (selected == null) {
+              return _CategoriesView(
+                words: words,
+                grammar: grammar,
+                learned: learned,
+                query: _query,
+                searchController: _searchController,
+                onQueryChanged: (value) => setState(() => _query = value),
+                onClearQuery: () {
+                  _searchController.clear();
+                  setState(() => _query = '');
+                },
+                onCategoryTap: _selectCategory,
+              );
+            }
+            final categoryWords = words
+                .where((w) =>
+                    categoryFor(w, grammar.sectionOf(w)).id == selected.id)
+                .toList(growable: false);
+            return _CategoryWordsView(
+              words: categoryWords,
+              list: list,
+              grammar: grammar,
+              showRanks: _query.trim().isEmpty,
+              query: _query,
+              searchController: _searchController,
+              onQueryChanged: (value) => setState(() => _query = value),
+              onWordTap: _openWord,
             );
           },
         ),
@@ -155,207 +167,342 @@ class _LevelWordsScreenState extends State<LevelWordsScreen> {
   }
 }
 
-/// Lazily renders the visible words grouped into part-of-speech sections.
-class _GroupedWordList extends StatelessWidget {
-  const _GroupedWordList({
-    required this.visible,
+/// The category grid (default view): one rich card per theme / POS bucket with
+/// a word count and a "learned" progress bar.
+class _CategoriesView extends StatelessWidget {
+  const _CategoriesView({
+    required this.words,
     required this.grammar,
-    required this.rankOf,
-    required this.showRanks,
-    required this.onWordTap,
+    required this.learned,
+    required this.query,
+    required this.searchController,
+    required this.onQueryChanged,
+    required this.onClearQuery,
+    required this.onCategoryTap,
   });
 
-  final List<String> visible;
+  final List<String> words;
   final EnglishGrammar grammar;
-  final int? Function(String word) rankOf;
-  final bool showRanks;
-  final void Function(String word, int? rank) onWordTap;
-
-  /// Section order: the major content-word groups first, then everything else.
-  static const List<EnglishSection> _order = [
-    EnglishSection.verb,
-    EnglishSection.noun,
-    EnglishSection.adjective,
-    EnglishSection.adverb,
-    EnglishSection.other,
-  ];
+  final Set<String> learned;
+  final String query;
+  final TextEditingController searchController;
+  final ValueChanged<String> onQueryChanged;
+  final VoidCallback onClearQuery;
+  final ValueChanged<VocabularyCategory> onCategoryTap;
 
   @override
   Widget build(BuildContext context) {
-    final sections = <EnglishSection, List<String>>{
-      for (final section in _order) section: <String>[],
-    };
-    for (final word in visible) {
-      sections[grammar.sectionOf(word)]!.add(word);
-    }
-    final rows = <_Row>[];
-    for (final section in _order) {
-      final words = sections[section]!;
-      if (words.isEmpty) continue;
-      rows.add(_Row.header(section, words.length));
-      rows.addAll(words.map(_Row.word));
-    }
-    if (rows.isEmpty) {
-      return const SizedBox.shrink();
+    final categories = <VocabularyCategory, int>{};
+    final learnedCounts = <VocabularyCategory, int>{};
+    for (final word in words) {
+      final category = categoryFor(word, grammar.sectionOf(word));
+      categories.update(category, (count) => count + 1, ifAbsent: () => 1);
+      if (learned.contains(word)) {
+        learnedCounts.update(category, (count) => count + 1, ifAbsent: () => 1);
+      }
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-      itemCount: rows.length,
-      itemBuilder: (context, index) {
-        final row = rows[index];
-        if (row.isHeader) {
-          return _SectionHeader(
-            section: row.section!,
-            count: row.count!,
-          );
-        }
-        final word = row.word!;
-        return _WordTile(
-          word: word,
-          rank: showRanks ? rankOf(word) : null,
-          posLabel: grammar.partOfSpeech(word),
-          onTap: () => onWordTap(word, showRanks ? rankOf(word) : null),
-        );
-      },
-    );
-  }
-}
+    final q = query.trim().toLowerCase();
+    final visible = [
+      for (final entry in categories.entries)
+        if (entry.value > 0 && (q.isEmpty || entry.key.title.toLowerCase().contains(q)))
+          (category: entry.key, count: entry.value),
+    ]..sort((a, b) => b.count.compareTo(a.count));
 
-class _Row {
-  const _Row.header(this.section, this.count)
-      : word = null,
-        isHeader = true;
-  const _Row.word(this.word)
-      : section = null,
-        count = null,
-        isHeader = false;
-
-  final EnglishSection? section;
-  final int? count;
-  final String? word;
-  final bool isHeader;
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.section, required this.count});
-
-  final EnglishSection section;
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    context.watch<UiTranslationController?>();
-    final label = switch (section) {
-      EnglishSection.verb => 'Verbs',
-      EnglishSection.noun => 'Nouns',
-      EnglishSection.adjective => 'Adjectives',
-      EnglishSection.adverb => 'Adverbs',
-      EnglishSection.other => 'Other words',
-    };
-    return Padding(
-      padding: const EdgeInsets.only(top: 14, bottom: 6),
-      child: Row(
-        children: [
-          Text(
-            context.tr(label),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 4),
+          child: Text(
+            context.trTempl(
+              '{0} words · choose a theme to focus on',
+              [words.length],
+            ),
             style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: ZovaColors.primary,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: ZovaColors.textSecondary,
             ),
           ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(
-              color: ZovaColors.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              '$count',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: ZovaColors.primary,
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
+          child: TextField(
+            controller: searchController,
+            onChanged: onQueryChanged,
+            decoration: InputDecoration(
+              hintText: context.tr('Find a theme…'),
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: query.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: onClearQuery,
+                    ),
+              filled: true,
+              fillColor: ZovaColors.surface,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
               ),
             ),
           ),
-        ],
-      ),
+        ),
+        Expanded(
+          child: visible.isEmpty
+              ? Center(
+                  child: Text(
+                    context.trTempl('No themes match "{0}".', [query]),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: ZovaColors.textSecondary),
+                  ),
+                )
+              : GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    mainAxisExtent: 138,
+                  ),
+                  itemCount: visible.length,
+                  itemBuilder: (context, index) {
+                    final item = visible[index];
+                    return _CategoryCard(
+                      category: item.category,
+                      count: item.count,
+                      learned: learnedCounts[item.category] ?? 0,
+                      onTap: () => onCategoryTap(item.category),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }
 
-class _WordTile extends StatelessWidget {
-  const _WordTile({
-    required this.word,
-    required this.rank,
-    required this.posLabel,
+/// A single category card: colored icon tile, title, word count and the
+/// fraction of the theme's words the learner has already "learned".
+class _CategoryCard extends StatelessWidget {
+  const _CategoryCard({
+    required this.category,
+    required this.count,
+    required this.learned,
     required this.onTap,
   });
 
-  final String word;
-  final int? rank;
-  final String? posLabel;
+  final VocabularyCategory category;
+  final int count;
+  final int learned;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    context.watch<UiTranslationController?>();
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+    final progress = count == 0 ? 0.0 : learned / count;
+    final accent = category.color;
+    final dark = Color.lerp(accent, Colors.black, 0.35)!;
+    return Material(
+      color: ZovaColors.surface,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              if (rank != null) ...[
-                Text(
-                  '#$rank',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: ZovaColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(width: 12),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                accent.withValues(alpha: 0.16),
+                ZovaColors.surface,
               ],
-              Expanded(
-                child: ContentText(
-                  word,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: ZovaColors.textPrimary,
+            ),
+          ),
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [accent, dark],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(category.icon, color: Colors.white, size: 22),
                   ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: TextStyle(
+                        color: accent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              TrText(
+                category.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: ZovaColors.textPrimary,
                 ),
               ),
-              if (posLabel != null) ...[
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: ZovaColors.surfaceRaised,
-                    borderRadius: BorderRadius.circular(8),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 6,
+                        backgroundColor:
+                            accent.withValues(alpha: 0.18),
+                        valueColor: AlwaysStoppedAnimation<Color>(accent),
+                      ),
+                    ),
                   ),
-                  child: Text(
-                    context.tr(posLabel!),
+                  const SizedBox(width: 8),
+                  Text(
+                    context.trTempl('{0} learned', [learned]),
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: ZovaColors.textSecondary,
                     ),
                   ),
-                ),
-                const SizedBox(width: 6),
-              ],
-              const Icon(Icons.chevron_right, color: ZovaColors.textSecondary),
+                ],
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The words of one category, with a search field and lazy word cards.
+class _CategoryWordsView extends StatelessWidget {
+  const _CategoryWordsView({
+    required this.words,
+    required this.list,
+    required this.grammar,
+    required this.showRanks,
+    required this.query,
+    required this.searchController,
+    required this.onQueryChanged,
+    required this.onWordTap,
+  });
+
+  final List<String> words;
+  final EnglishFrequencyList list;
+  final EnglishGrammar grammar;
+  final bool showRanks;
+  final String query;
+  final TextEditingController searchController;
+  final ValueChanged<String> onQueryChanged;
+  final void Function(String word, int? rank) onWordTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final q = query.trim().toLowerCase();
+    final visible = q.isEmpty
+        ? words
+        : words.where((w) => w.contains(q)).toList(growable: false);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 4),
+          child: Text(
+            context.trTempl('{0} words', [words.length]),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: ZovaColors.textSecondary,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
+          child: TextField(
+            controller: searchController,
+            onChanged: onQueryChanged,
+            decoration: InputDecoration(
+              hintText: context.tr('Filter words…'),
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: q.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        searchController.clear();
+                        onQueryChanged('');
+                      },
+                    ),
+              filled: true,
+              fillColor: ZovaColors.surface,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: visible.isEmpty
+              ? Center(
+                  child: Text(
+                    context.trTempl('No words match "{0}".', [query]),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: ZovaColors.textSecondary),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+                  itemCount: visible.length,
+                  itemBuilder: (context, index) {
+                    final word = visible[index];
+                    final rank = showRanks ? list.rankOf(word) : null;
+                    return VocabularyCard(
+                      word: word,
+                      liveTranslate: true,
+                      gender: grammar.partOfSpeech(word) == null
+                          ? null
+                          : context
+                              .tr(grammar.partOfSpeech(word)!),
+                      level: rank != null ? '#$rank' : null,
+                      onTap: () => onWordTap(word, rank),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }

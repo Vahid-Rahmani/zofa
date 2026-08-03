@@ -6,6 +6,7 @@ import '../../core/state/language_controller.dart';
 import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../core/widgets/tr_text.dart';
+import '../../core/widgets/vocabulary_card.dart';
 import '../../data/models/translation_result.dart';
 import '../../data/services/translation_service.dart';
 
@@ -284,97 +285,42 @@ class _WordCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final result = entry.result;
-    final rtl = result?.isRtl ?? false;
     context.watch<UiTranslationController?>();
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: ZovaColors.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
+    return VocabularyCard(
+      word: entry.word,
+      gender: result?.gender,
+      translation: entry.failed
+          ? context.tr('Offline — tap to retry')
+          : result?.translation,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        entry.word,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: ZovaColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                    if (result?.glossLine != null) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        result!.glossLine!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontStyle: FontStyle.italic,
-                          color: ZovaColors.textSecondary.withValues(alpha: 0.8),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 4),
-                if (entry.failed)
-                  Row(
-                    children: [
-                      const Icon(Icons.cloud_off,
-                          size: 14, color: ZovaColors.textSecondary),
-                      const SizedBox(width: 6),
-                      const Expanded(
-                        child: TrText(
-                          'Offline — tap to retry',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: ZovaColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: context.tr('Retry'),
-                        onPressed: onRetry,
-                        icon: const Icon(Icons.refresh, size: 18),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ],
-                  )
-                else
-                  Text(
-                    result?.translation ?? '',
-                    textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: ZovaColors.secondary,
-                    ),
-                  ),
-              ],
+          if (entry.failed)
+            IconButton(
+              tooltip: context.tr('Retry'),
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh, size: 20),
+              color: Colors.white70,
+              visualDensity: VisualDensity.compact,
             ),
-          ),
           IconButton(
             tooltip: context.tr('Add to Leitner Box'),
             onPressed: inLeitner ? null : onAddToLeitner,
             icon: Icon(
               inLeitner ? Icons.style : Icons.style_outlined,
-              color: inLeitner ? ZovaColors.primary : ZovaColors.textSecondary,
+              size: 20,
+              color:
+                  inLeitner ? ZovaColors.primary : Colors.white.withValues(alpha: 0.7),
             ),
+            visualDensity: VisualDensity.compact,
           ),
           IconButton(
             tooltip: context.tr('Remove from My Words'),
             onPressed: onRemove,
             icon: const Icon(Icons.bookmark_remove_outlined,
-                color: ZovaColors.textSecondary),
+                size: 20, color: Colors.white70),
+            visualDensity: VisualDensity.compact,
           ),
         ],
       ),

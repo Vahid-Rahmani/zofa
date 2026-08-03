@@ -46,6 +46,12 @@ class HomeScreen extends StatelessWidget {
     final languageName =
         TranslationLanguage.byCode(languageCode)?.name ?? languageCode;
 
+    final progress = controller.progress;
+    final learningCount = progress.learningFor(languageCode).length;
+    final savedCount = progress.savedWordsFor(languageCode).length;
+    final lessonsDone = progress.completedLessonsFor(languageCode).length;
+    final boxedCount = progress.leitnerBoxesFor(languageCode).length;
+
     return Scaffold(
       body: SafeArea(
         child: ListView(
@@ -69,8 +75,12 @@ class HomeScreen extends StatelessWidget {
             const _SectionHeader(
               title: 'Learn',
               subtitle: 'Choose how you want to study today',
-            ),            const SizedBox(height: 14),
+            ),
+            const SizedBox(height: 14),
             _FeatureGrid(
+              learningCount: learningCount,
+              savedCount: savedCount,
+              lessonsDone: lessonsDone,
               onVocabulary: () => onNavigateToTab(2),
               onListeningReading: () =>
                   _push(context, const BooksScreen()),
@@ -84,6 +94,8 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             _QuickAccessGrid(
+              boxedCount: boxedCount,
+              savedCount: savedCount,
               onLeitner: () => _push(context, const LeitnerBoxScreen()),
               onMyWords: () => _push(context, const MyWordsScreen()),
               onShop: () => _push(context, const PaywallScreen()),
@@ -562,12 +574,18 @@ class _SectionHeader extends StatelessWidget {
 
 class _FeatureGrid extends StatelessWidget {
   const _FeatureGrid({
+    required this.learningCount,
+    required this.savedCount,
+    required this.lessonsDone,
     required this.onVocabulary,
     required this.onListeningReading,
     required this.onAlphabet,
     required this.onGrammar,
   });
 
+  final int learningCount;
+  final int savedCount;
+  final int lessonsDone;
   final VoidCallback onVocabulary;
   final VoidCallback onListeningReading;
   final VoidCallback onAlphabet;
@@ -581,30 +599,41 @@ class _FeatureGrid extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
-      childAspectRatio: 1.35,
+      childAspectRatio: 1.05,
       children: [
         _FeatureCard(
           icon: Icons.translate,
           title: 'Vocabulary',
+          subtitle: 'Words by theme across 6 levels',
           colors: const [ZovaColors.primary, ZovaColors.primaryDark],
+          counter: context.trTempl('{0} words learning', [learningCount]),
+          progress: (learningCount / 50).clamp(0.0, 1.0),
           onTap: onVocabulary,
         ),
         _FeatureCard(
           icon: Icons.headphones,
           title: 'Listening & Reading',
+          subtitle: 'Stories matched to your level',
           colors: const [ZovaColors.secondary, Color(0xFF2B8FD0)],
+          counter: context.trTempl('{0} lessons done', [lessonsDone]),
+          progress: (lessonsDone / 24).clamp(0.0, 1.0),
           onTap: onListeningReading,
         ),
         _FeatureCard(
           icon: Icons.abc,
           title: 'Alphabet & Pronunciation',
+          subtitle: 'Letters, sounds & syllables',
           colors: const [ZovaColors.warning, Color(0xFFD99A26)],
+          counter: context.tr('26 letters'),
           onTap: onAlphabet,
         ),
         _FeatureCard(
           icon: Icons.fact_check,
           title: 'Grammar',
+          subtitle: 'Patterns behind every sentence',
           colors: const [ZovaColors.success, Color(0xFF1F9A58)],
+          counter: context.trTempl('{0} words saved', [savedCount]),
+          progress: (savedCount / 50).clamp(0.0, 1.0),
           onTap: onGrammar,
         ),
       ],
@@ -616,41 +645,79 @@ class _FeatureCard extends StatelessWidget {
   const _FeatureCard({
     required this.icon,
     required this.title,
+    required this.subtitle,
     required this.colors,
+    required this.counter,
     required this.onTap,
+    this.progress,
   });
 
   final IconData icon;
   final String title;
+  final String subtitle;
   final List<Color> colors;
+  final String counter;
+
+  /// Optional 0..1 fill for the thin progress bar; hidden when null.
+  final double? progress;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
+    final accent = colors.first;
     return Material(
       color: ZovaColors.surface,
       borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
-        child: Padding(
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                accent.withValues(alpha: 0.14),
+                ZovaColors.surface,
+              ],
+            ),
+          ),
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 46,
-                height: 46,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: colors,
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: colors,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 24),
                   ),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: Colors.white, size: 24),
+                  const Spacer(),
+                  if (progress != null)
+                    Container(
+                      width: 30,
+                      height: 30,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.arrow_outward,
+                          color: accent, size: 18),
+                    ),
+                ],
               ),
               const Spacer(),
               TrText(
@@ -663,6 +730,39 @@ class _FeatureCard extends StatelessWidget {
                   color: ZovaColors.textPrimary,
                 ),
               ),
+              const SizedBox(height: 2),
+              TrText(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: ZovaColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              if (progress != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 6,
+                    backgroundColor: accent.withValues(alpha: 0.18),
+                    valueColor: AlwaysStoppedAnimation<Color>(accent),
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
+              TrText(
+                counter,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: accent,
+                ),
+              ),
             ],
           ),
         ),
@@ -673,12 +773,16 @@ class _FeatureCard extends StatelessWidget {
 
 class _QuickAccessGrid extends StatelessWidget {
   const _QuickAccessGrid({
+    required this.boxedCount,
+    required this.savedCount,
     required this.onLeitner,
     required this.onMyWords,
     required this.onShop,
     required this.onSocial,
   });
 
+  final int boxedCount;
+  final int savedCount;
   final VoidCallback onLeitner;
   final VoidCallback onMyWords;
   final VoidCallback onShop;
@@ -692,29 +796,33 @@ class _QuickAccessGrid extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
-      childAspectRatio: 2.1,
+      childAspectRatio: 1.75,
       children: [
         _QuickTile(
           icon: Icons.style,
           title: 'Leitner Box',
+          subtitle: context.trTempl('{0} cards in review', [boxedCount]),
           color: ZovaColors.primary,
           onTap: onLeitner,
         ),
         _QuickTile(
           icon: Icons.bookmark,
           title: 'My Words',
+          subtitle: context.trTempl('{0} saved', [savedCount]),
           color: ZovaColors.success,
           onTap: onMyWords,
         ),
         _QuickTile(
           icon: Icons.storefront,
           title: 'Shop',
+          subtitle: context.tr('Hearts, boosts & perks'),
           color: ZovaColors.warning,
           onTap: onShop,
         ),
         _QuickTile(
           icon: Icons.share,
           title: 'Social',
+          subtitle: context.tr('Share your streak'),
           color: ZovaColors.secondary,
           onTap: onSocial,
         ),
@@ -727,24 +835,38 @@ class _QuickTile extends StatelessWidget {
   const _QuickTile({
     required this.icon,
     required this.title,
+    required this.subtitle,
     required this.color,
     required this.onTap,
   });
 
   final IconData icon;
   final String title;
+  final String subtitle;
   final Color color;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    context.watch<UiTranslationController?>();
     return Material(
       color: ZovaColors.surface,
       borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
-        child: Padding(
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                color.withValues(alpha: 0.10),
+                ZovaColors.surface,
+              ],
+            ),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
@@ -753,10 +875,14 @@ class _QuickTile extends StatelessWidget {
                 height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [color, Color.lerp(color, Colors.black, 0.35)!],
+                  ),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: color, size: 20),
+                child: Icon(icon, color: Colors.white, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -772,6 +898,16 @@ class _QuickTile extends StatelessWidget {
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                         color: ZovaColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    TrText(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: ZovaColors.textSecondary,
                       ),
                     ),
                   ],

@@ -198,6 +198,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+
+      // Every seeded word is untagged, so they all live in the "Other words"
+      // theme; drill in so the translated word tiles are on screen.
+      await tester.tap(find.text('Other words'));
+      await tester.pumpAndSettle();
     }
 
     testWidgets('every word in the list is shown translated into the native language',

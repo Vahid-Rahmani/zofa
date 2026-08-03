@@ -178,12 +178,14 @@ void main() {
     expect(find.text('FA:run'), findsNWidgets(2));
   });
 
-  testWidgets('tapping a word in the level list opens its study screen',
+  testWidgets('tapping a word in a theme opens its study screen',
       (tester) async {
     await tester.pumpWidget(_wrap(const LevelWordsScreen(level: 'A1')));
     await tester.pumpAndSettle();
 
     expect(find.byType(WordStudyScreen), findsNothing);
+    await tester.tap(find.text('Verbs'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('be'));
     await tester.pumpAndSettle();
 
