@@ -12,11 +12,12 @@ import '../../data/services/translation_service.dart';
 
 /// Full dictionary-style study card for one word from the 50k vocabulary list.
 ///
-/// Loads the live translation into the learner's native language (cached on
-/// device), shows the part of speech and — when the word is a verb — an
-/// Active/Passive conjugation table for Present / Past / Future, plus example
-/// sentences. Every verb form and example is also translated live into the
-/// native language, so the learner reads English and its gloss side by side.
+/// Loads the live translation into the learner's learning language (the
+/// "second language", cached on device), shows the part of speech and — when
+/// the word is a verb — an Active/Passive conjugation table for Present / Past
+/// / Future, plus example sentences. Every verb form and example is also
+/// translated live into the learning language, so the learner reads English
+/// and its gloss side by side.
 class WordStudyScreen extends StatefulWidget {
   const WordStudyScreen({super.key, required this.word, this.level, this.rank});
 
@@ -39,7 +40,7 @@ class _WordStudyScreenState extends State<WordStudyScreen> {
   bool _loading = true;
   bool _loadingGlosses = false;
 
-  /// English phrase → translated gloss in the learner's native language.
+  /// English phrase → translated gloss in the learner's learning language.
   final Map<String, String> _glosses = {};
 
   @override
@@ -51,7 +52,8 @@ class _WordStudyScreenState extends State<WordStudyScreen> {
   String get _word => widget.word;
 
   Future<void> _load() async {
-    final target = context.read<LanguageController>().settings.nativeLanguage;
+    final target =
+        context.read<LanguageController>().settings.contentLanguageCode;
     setState(() {
       _loading = true;
       _error = null;

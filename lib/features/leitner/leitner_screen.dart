@@ -51,7 +51,7 @@ class _LeitnerBoxScreenState extends State<LeitnerBoxScreen> {
     final controller = context.read<AppController>();
     final settings = context.read<LanguageController>().settings;
     final scope = settings.learningLanguage;
-    final target = settings.nativeLanguage;
+    final target = settings.contentLanguageCode;
     _resolved.clear();
     for (final word in controller.progress.leitnerBoxesFor(scope).keys) {
       await _resolve(word, target);
@@ -221,7 +221,7 @@ class _WordPoolCardState extends State<_WordPoolCard> {
       ..shuffle(Random(_seed));
 
     final languageCode =
-        context.read<LanguageController>().settings.nativeLanguage;
+        context.read<LanguageController>().settings.contentLanguageCode;
     final resolved = <_PoolWord>[];
     for (final word in candidates.take(_shown)) {
       String? translation;
@@ -463,7 +463,7 @@ class _WordPoolCardState extends State<_WordPoolCard> {
 
   bool _isRtlTarget() =>
       TranslationLanguage.byCode(
-            context.read<LanguageController>().settings.nativeLanguage,
+            context.read<LanguageController>().settings.contentLanguageCode,
           )?.isRtl ??
       false;
 }

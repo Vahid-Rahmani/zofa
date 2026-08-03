@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'core/config/env_config.dart';
 import 'core/state/app_controller.dart';
+import 'core/state/content_translation_controller.dart';
 import 'core/state/language_controller.dart';
 import 'core/state/ui_translation_controller.dart';
 import 'core/theme/zova_theme.dart';
@@ -18,18 +19,20 @@ class ZovaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final language = context.watch<LanguageController>();
-    return UiLanguageSync(
-      child: MaterialApp(
-        title: EnvConfig.appName,
-        debugShowCheckedModeBanner: false,
-        theme: ZovaTheme.dark,
-        locale: Locale(language.settings.uiLanguageCode),
-        builder: (context, child) => Directionality(
-          textDirection:
-              language.isRtlUi ? TextDirection.rtl : TextDirection.ltr,
-          child: child ?? const SizedBox.shrink(),
+    return ContentLanguageSync(
+      child: UiLanguageSync(
+        child: MaterialApp(
+          title: EnvConfig.appName,
+          debugShowCheckedModeBanner: false,
+          theme: ZovaTheme.dark,
+          locale: Locale(language.settings.uiLanguageCode),
+          builder: (context, child) => Directionality(
+            textDirection:
+                language.isRtlUi ? TextDirection.rtl : TextDirection.ltr,
+            child: child ?? const SizedBox.shrink(),
+          ),
+          home: const SessionGate(),
         ),
-        home: const SessionGate(),
       ),
     );
   }
@@ -65,6 +68,42 @@ class _UiLanguageSyncState extends State<UiLanguageSync> {
     if (ui == null) return;
     final code = language.settings.uiLanguageCode;
     if (ui.code != code) ui.setCode(code);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+/// Keeps the [ContentTranslationController] target in sync with the chosen
+/// learning language so learning content re-translates live.
+class ContentLanguageSync extends StatefulWidget {
+  const ContentLanguageSync({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<ContentLanguageSync> createState() => _ContentLanguageSyncState();
+}
+
+class _ContentLanguageSyncState extends State<ContentLanguageSync> {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(covariant ContentLanguageSync oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _sync();
+  }
+
+  void _sync() {
+    final language = context.watch<LanguageController>();
+    final content = context.read<ContentTranslationController?>();
+    if (content == null) return;
+    final code = language.settings.contentLanguageCode;
+    if (content.code != code) content.setCode(code);
   }
 
   @override

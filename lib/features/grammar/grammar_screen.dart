@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/state/language_controller.dart';
 import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/content_text.dart';
 import '../../core/widgets/tr_text.dart';
 import '../../data/models/grammar_topic.dart';
 import '../../data/services/grammar_content.dart';
@@ -222,10 +224,12 @@ class GrammarDetailScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 3),
-                      Text(
-                        topic.faTitle,
-                        textDirection: TextDirection.rtl,
-                        style: const TextStyle(color: ZovaColors.textSecondary),
+                      _ContentString(
+                        topic.title,
+                        persian: topic.faTitle,
+                        style: const TextStyle(
+                          color: ZovaColors.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -249,7 +253,7 @@ class GrammarDetailScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 22),
-            Text(
+            _ContentString(
               topic.explanation,
               style: const TextStyle(
                 fontSize: 16,
@@ -287,9 +291,9 @@ class GrammarDetailScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      example.persian,
-                      textDirection: TextDirection.rtl,
+                    _ContentString(
+                      example.english,
+                      persian: example.persian,
                       style: const TextStyle(
                         fontSize: 15,
                         color: ZovaColors.textSecondary,
@@ -318,7 +322,7 @@ class GrammarDetailScreen extends StatelessWidget {
                         color: ZovaColors.warning, size: 20),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
+                      child: _ContentString(
                         topic.tip!,
                         style: const TextStyle(
                           color: ZovaColors.textPrimary,
@@ -335,5 +339,34 @@ class GrammarDetailScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Grammar content translated into the learner's language of study: the
+/// bundled Persian copy when the study language is Persian (offline-ready,
+/// accurate), otherwise a live translation via [ContentText].
+class _ContentString extends StatelessWidget {
+  const _ContentString(
+    this.english, {
+    this.persian,
+    this.style,
+  });
+
+  final String english;
+  final String? persian;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final code =
+        context.read<LanguageController>().settings.contentLanguageCode;
+    if (code == 'fa' && persian != null && persian!.isNotEmpty) {
+      return Text(
+        persian!,
+        textDirection: TextDirection.rtl,
+        style: style,
+      );
+    }
+    return ContentText(english, style: style);
   }
 }

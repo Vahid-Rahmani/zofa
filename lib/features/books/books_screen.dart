@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/state/app_controller.dart';
 import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/content_text.dart';
 import '../../core/widgets/tr_text.dart';
 import '../../data/models/book.dart';
 import '../../data/services/seed_content.dart';
@@ -180,7 +181,7 @@ class _BookCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    ContentText(
                       book.title,
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,

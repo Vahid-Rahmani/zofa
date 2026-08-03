@@ -6,15 +6,18 @@ import '../../core/state/language_controller.dart';
 import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../core/utils/clean_text.dart';
+import '../../core/widgets/content_text.dart';
 import '../../core/widgets/tr_text.dart';
 import '../../data/models/book.dart';
+import '../../data/models/translation_language.dart';
 import '../../data/models/translation_result.dart';
 import '../../data/services/translation_service.dart';
 
 /// Interactive reader: paragraphs are rendered as tappable text so the user
 /// can look up any word (through the live translation bridge) and grow their
 /// vocabulary while reading. A toggle switches between the English text and
-/// its Persian translation.
+/// its translation into the learner's language of study (bundled Persian for
+/// Persian learners, otherwise live-translated).
 class ReaderScreen extends StatefulWidget {
   const ReaderScreen({super.key, required this.book});
 
@@ -27,7 +30,7 @@ class ReaderScreen extends StatefulWidget {
 class _ReaderScreenState extends State<ReaderScreen> {
   late int _chapterIndex;
   late final PageController _pageController;
-  bool _showPersian = false;
+  bool _showTranslation = false;
 
   @override
   void initState() {
@@ -54,7 +57,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   Future<void> _showWordSheet(String word) async {
     final languageCode =
-        context.read<LanguageController>().settings.nativeLanguage;
+        context.read<LanguageController>().settings.contentLanguageCode;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: ZovaColors.surfaceRaised,
@@ -69,6 +72,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
   @override
   Widget build(BuildContext context) {
     context.watch<UiTranslationController?>();
+    final translationCode =
+        context.read<LanguageController>().settings.contentLanguageCode;
+    final translationLabel =
+        TranslationLanguage.byCode(translationCode)?.label ?? translationCode;
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -87,16 +94,19 @@ class _ReaderScreenState extends State<ReaderScreen> {
         ),
         actions: [
           TextButton.icon(
-            onPressed: () => setState(() => _showPersian = !_showPersian),
+            onPressed: () =>
+                setState(() => _showTranslation = !_showTranslation),
             icon: Icon(
-              _showPersian ? Icons.language : Icons.g_translate,
-              color: _showPersian ? ZovaColors.secondary : ZovaColors.textSecondary,
+              _showTranslation ? Icons.language : Icons.g_translate,
+              color: _showTranslation
+                  ? ZovaColors.secondary
+                  : ZovaColors.textSecondary,
               size: 20,
             ),
             label: Text(
-              context.tr(_showPersian ? 'Persian' : 'English'),
+              _showTranslation ? translationLabel : 'English',
               style: TextStyle(
-                color: _showPersian
+                color: _showTranslation
                     ? ZovaColors.secondary
                     : ZovaColors.textSecondary,
                 fontWeight: FontWeight.w600,
@@ -114,7 +124,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
             return _ParagraphPage(
               chapter: widget.book.chapters[chapterIndex],
               onWordTap: _showWordSheet,
-              showPersian: _showPersian,
+              showTranslation: _showTranslation,
+              translationCode: translationCode,
             );
           },
         ),
@@ -371,15 +382,23 @@ class _ParagraphPage extends StatelessWidget {
   const _ParagraphPage({
     required this.chapter,
     required this.onWordTap,
-    required this.showPersian,
+    required this.showTranslation,
+    required this.translationCode,
   });
 
   final BookChapter chapter;
   final ValueChanged<String> onWordTap;
-  final bool showPersian;
+  final bool showTranslation;
+  final String translationCode;
 
   @override
   Widget build(BuildContext context) {
+    const titleStyle = TextStyle(
+      fontSize: 30,
+      fontWeight: FontWeight.w800,
+      height: 1.15,
+      color: ZovaColors.textPrimary,
+    );
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 28, 24, 48),
       child: Column(
@@ -402,15 +421,10 @@ class _ParagraphPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Text(
-            chapter.title,
-            style: const TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.w800,
-              height: 1.15,
-              color: ZovaColors.textPrimary,
-            ),
-          ),
+          if (showTranslation)
+            ContentText(chapter.title, style: titleStyle)
+          else
+            Text(chapter.title, style: titleStyle),
           const SizedBox(height: 14),
           Container(
             width: 56,
@@ -421,21 +435,63 @@ class _ParagraphPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 26),
-          if (showPersian)
-            for (final paragraph in chapter.paragraphs)
-              _ParagraphBlock(
-                text: paragraph.translation ?? paragraph.text,
-                rtl: paragraph.translation != null,
-                onWordTap: onWordTap,
+          for (final paragraph in chapter.paragraphs)
+            if (showTranslation)
+              _TranslationParagraph(
+                paragraph: paragraph,
+                translationCode: translationCode,
               )
-          else
-            for (final paragraph in chapter.paragraphs)
+            else
               _ParagraphBlock(
                 text: paragraph.text,
                 rtl: false,
                 onWordTap: onWordTap,
               ),
         ],
+      ),
+    );
+  }
+}
+
+/// A paragraph shown in the reader's translation view: the bundled Persian
+/// translation when the study language is Persian (offline-ready), otherwise a
+/// live-translated paragraph via [ContentText].
+class _TranslationParagraph extends StatelessWidget {
+  const _TranslationParagraph({
+    required this.paragraph,
+    required this.translationCode,
+  });
+
+  final BookParagraph paragraph;
+  final String translationCode;
+
+  @override
+  Widget build(BuildContext context) {
+    final bundled = paragraph.translation;
+    if (translationCode == 'fa' && bundled != null && bundled.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 22),
+        child: Text(
+          bundled,
+          textDirection: TextDirection.rtl,
+          textAlign: TextAlign.right,
+          style: const TextStyle(
+            fontSize: 18,
+            height: 2.0,
+            color: ZovaColors.textPrimary,
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 22),
+      child: ContentText(
+        paragraph.text,
+        style: const TextStyle(
+          fontSize: 18,
+          height: 2.0,
+          color: ZovaColors.textPrimary,
+        ),
       ),
     );
   }

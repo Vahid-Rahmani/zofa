@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/content_text.dart';
 import '../../core/widgets/tr_text.dart';
 import '../../data/services/english_frequency.dart';
 import '../../data/services/english_grammar.dart';
@@ -10,9 +11,9 @@ import 'word_study_screen.dart';
 
 /// All the words in one CEFR level (e.g. `B1`), lazily rendered so levels with
 /// tens of thousands of words stay fast. Words are grouped into part-of-speech
-/// sections (Verbs, Nouns, Adjectives, Adverbs, Other words). Tapping a word
-/// opens the dictionary-style [WordStudyScreen], which translates it live into
-/// the learner's native language and shows verb forms and examples.
+/// sections (Verbs, Nouns, Adjectives, Adverbs, Other words). Every word is
+/// live-translated into the learner's native (first) language; tapping it opens
+/// the dictionary-style [WordStudyScreen], which shows verb forms and examples.
 class LevelWordsScreen extends StatefulWidget {
   const LevelWordsScreen({super.key, required this.level});
 
@@ -322,7 +323,7 @@ class _WordTile extends StatelessWidget {
                 const SizedBox(width: 12),
               ],
               Expanded(
-                child: Text(
+                child: ContentText(
                   word,
                   style: const TextStyle(
                     fontSize: 16,

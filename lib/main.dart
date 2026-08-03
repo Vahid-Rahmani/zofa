@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'app.dart';
 import 'core/state/app_controller.dart';
+import 'core/state/content_translation_controller.dart';
 import 'core/state/language_controller.dart';
 import 'core/state/ui_translation_controller.dart';
 import 'data/services/remote_api.dart';
@@ -38,12 +39,20 @@ Future<void> main() async {
   await uiTranslation.bootstrap();
   uiTranslation.setCode(language.settings.uiLanguageCode);
 
+  // Live Google content translation: vocabulary, books and grammar are
+  // translated into the learner's "second language" (the language being
+  // learned) and cached on-device.
+  final contentTranslation = ContentTranslationController();
+  await contentTranslation.bootstrap();
+  contentTranslation.setCode(language.settings.contentLanguageCode);
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AppController(language: language)),
         ChangeNotifierProvider.value(value: language),
         ChangeNotifierProvider.value(value: uiTranslation),
+        ChangeNotifierProvider.value(value: contentTranslation),
       ],
       child: const ZovaApp(),
     ),

@@ -230,7 +230,7 @@ class _Flashcard extends StatelessWidget {
 
   Widget _meaning(BuildContext context) {
     final code =
-        context.watch<LanguageController>().settings.nativeLanguage;
+        context.watch<LanguageController>().settings.contentLanguageCode;
     final rtl = entry.isRtl || code == 'fa';
     return SingleChildScrollView(
       key: const ValueKey('meaning'),

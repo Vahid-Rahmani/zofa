@@ -53,6 +53,11 @@ class LanguageSettings {
   /// in their native language.
   AppLanguage get translationLanguage => AppLanguage.fromCode(nativeLanguage);
 
+  /// ISO code learning content is translated into: the learner's first/native
+  /// language (the language picked during onboarding / settings). Content is
+  /// authored in English and is live-translated into this language on demand.
+  String get contentLanguageCode => nativeLanguage;
+
   /// Whether the UI should render right-to-left (Persian or Arabic native
   /// language).
   bool get isRtlUi {

@@ -22,7 +22,7 @@ class MyWordsScreen extends StatelessWidget {
     final controller = context.watch<AppController>();
     final settings = context.watch<LanguageController>().settings;
     final savedWords = controller.progress.savedWordsFor(settings.learningLanguage);
-    final languageCode = settings.nativeLanguage;
+    final languageCode = settings.contentLanguageCode;
 
     return Scaffold(
       appBar: AppBar(title: const TrText('My Words')),

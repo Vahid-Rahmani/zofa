@@ -63,6 +63,25 @@ void main() {
       expect(next.nativeLanguage, 'en');
       expect(next.learningLanguage, 'en');
     });
+
+    test('content targets the first language', () {
+      const settings = LanguageSettings();
+      // Default: a Persian speaker learning English — content translates
+      // into the first/native language.
+      expect(settings.contentLanguageCode, 'fa');
+
+      const turkish =
+          LanguageSettings(nativeLanguage: 'fa', learningLanguage: 'tr');
+      expect(turkish.contentLanguageCode, 'fa');
+
+      const german =
+          LanguageSettings(nativeLanguage: 'de', learningLanguage: 'tr');
+      expect(german.contentLanguageCode, 'de');
+
+      const englishNative =
+          LanguageSettings(nativeLanguage: 'en', learningLanguage: 'de');
+      expect(englishNative.contentLanguageCode, 'en');
+    });
   });
 
   group('LanguageController', () {
