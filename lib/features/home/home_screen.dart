@@ -6,6 +6,7 @@ import '../../core/state/app_controller.dart';
 import '../../core/state/language_controller.dart';
 import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
+import '../../core/widgets/ambient_background.dart';
 import '../../core/widgets/tr_text.dart';
 import '../../data/models/app_user.dart';
 import '../../data/models/course.dart';
@@ -39,10 +40,8 @@ class HomeScreen extends StatelessWidget {
     final user = controller.user;
     if (user == null) return const SizedBox.shrink();
 
-    final languageCode = context
-        .watch<LanguageController>()
-        .settings
-        .learningLanguage;
+    final languageCode =
+        context.watch<LanguageController>().settings.learningLanguage;
     final languageName =
         TranslationLanguage.byCode(languageCode)?.name ?? languageCode;
 
@@ -53,55 +52,56 @@ class HomeScreen extends StatelessWidget {
     final boxedCount = progress.leitnerBoxesFor(languageCode).length;
 
     return Scaffold(
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-          children: [
-            _GreetingHeader(
-              user: user,
-              learningLanguageName: languageName,
-              streak: controller.progress.streakDays,
-              xp: controller.progress.xp,
-            ),
-            const SizedBox(height: 20),
-            _ContinueCard(onGoToCourses: () => onNavigateToTab(1)),
-            const SizedBox(height: 20),
-            _GamificationSection(
-              onQuests: () => _push(context, const QuestsScreen()),
-              onLeague: () => _push(context, const LeagueScreen()),
-              onBadges: () => _push(context, const BadgesScreen()),
-            ),
-            const SizedBox(height: 28),
-            const _SectionHeader(
-              title: 'Learn',
-              subtitle: 'Choose how you want to study today',
-            ),
-            const SizedBox(height: 14),
-            _FeatureGrid(
-              learningCount: learningCount,
-              savedCount: savedCount,
-              lessonsDone: lessonsDone,
-              onVocabulary: () => onNavigateToTab(2),
-              onListeningReading: () =>
-                  _push(context, const BooksScreen()),
-              onAlphabet: () => _push(context, const AlphabetScreen()),
-              onGrammar: () => _push(context, const GrammarScreen()),
-            ),
-            const SizedBox(height: 28),
-            const _SectionHeader(
-              title: 'Quick access',
-              subtitle: 'Review, shop and share',
-            ),
-            const SizedBox(height: 14),
-            _QuickAccessGrid(
-              boxedCount: boxedCount,
-              savedCount: savedCount,
-              onLeitner: () => _push(context, const LeitnerBoxScreen()),
-              onMyWords: () => _push(context, const MyWordsScreen()),
-              onShop: () => _push(context, const PaywallScreen()),
-              onSocial: () => _showSocialSheet(context),
-            ),
-          ],
+      body: AmbientBackground(
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+            children: [
+              _GreetingHeader(
+                user: user,
+                learningLanguageName: languageName,
+                streak: controller.progress.streakDays,
+                xp: controller.progress.xp,
+              ),
+              const SizedBox(height: 20),
+              _ContinueCard(onGoToCourses: () => onNavigateToTab(1)),
+              const SizedBox(height: 20),
+              _GamificationSection(
+                onQuests: () => _push(context, const QuestsScreen()),
+                onLeague: () => _push(context, const LeagueScreen()),
+                onBadges: () => _push(context, const BadgesScreen()),
+              ),
+              const SizedBox(height: 28),
+              const _SectionHeader(
+                title: 'Learn',
+                subtitle: 'Choose how you want to study today',
+              ),
+              const SizedBox(height: 14),
+              _FeatureGrid(
+                learningCount: learningCount,
+                savedCount: savedCount,
+                lessonsDone: lessonsDone,
+                onVocabulary: () => onNavigateToTab(2),
+                onListeningReading: () => _push(context, const BooksScreen()),
+                onAlphabet: () => _push(context, const AlphabetScreen()),
+                onGrammar: () => _push(context, const GrammarScreen()),
+              ),
+              const SizedBox(height: 28),
+              const _SectionHeader(
+                title: 'Quick access',
+                subtitle: 'Review, shop and share',
+              ),
+              const SizedBox(height: 14),
+              _QuickAccessGrid(
+                boxedCount: boxedCount,
+                savedCount: savedCount,
+                onLeitner: () => _push(context, const LeitnerBoxScreen()),
+                onMyWords: () => _push(context, const MyWordsScreen()),
+                onShop: () => _push(context, const PaywallScreen()),
+                onSocial: () => _showSocialSheet(context),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -171,15 +171,16 @@ class HomeScreen extends StatelessWidget {
                   handle,
                   style: const TextStyle(color: ZovaColors.textSecondary),
                 ),
-                trailing: const Icon(Icons.copy, color: ZovaColors.textSecondary),
+                trailing:
+                    const Icon(Icons.copy, color: ZovaColors.textSecondary),
                 onTap: () async {
                   await Clipboard.setData(ClipboardData(text: handle));
                   if (!context.mounted) return;
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content:
-                          Text(context.trTempl('Copied {0} to clipboard', [handle])),
+                      content: Text(
+                          context.trTempl('Copied {0} to clipboard', [handle])),
                     ),
                   );
                 },
@@ -213,9 +214,9 @@ class _GreetingHeader extends StatelessWidget {
   String get _firstName {
     final name = user.displayName ?? user.email;
     final first = name.split(RegExp(r'[ @]')).firstWhere(
-      (part) => part.isNotEmpty,
-      orElse: () => 'friend',
-    );
+          (part) => part.isNotEmpty,
+          orElse: () => 'friend',
+        );
     return first;
   }
 
@@ -245,8 +246,8 @@ class _GreetingHeader extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                context.trTempl('Learning {0} · keep it up!',
-                    [learningLanguageName]),
+                context.trTempl(
+                    'Learning {0} · keep it up!', [learningLanguageName]),
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: ZovaColors.textSecondary),
               ),
@@ -313,10 +314,8 @@ class _ContinueCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     context.watch<UiTranslationController?>();
-    final languageCode = context
-        .watch<LanguageController>()
-        .settings
-        .learningLanguage;
+    final languageCode =
+        context.watch<LanguageController>().settings.learningLanguage;
     return FutureBuilder<Course?>(
       future: SeedContent.courseFor(languageCode),
       builder: (context, snapshot) {
@@ -714,8 +713,7 @@ class _FeatureCard extends StatelessWidget {
                         color: accent.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(Icons.arrow_outward,
-                          color: accent, size: 18),
+                      child: Icon(Icons.arrow_outward, color: accent, size: 18),
                     ),
                 ],
               ),

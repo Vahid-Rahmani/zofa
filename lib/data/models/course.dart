@@ -15,6 +15,11 @@ class Lesson {
   final String icon;
   final List<Exercise> exercises;
 
+  /// Total number of vocabulary words studied across all exercises (the
+  /// flashcard exercise carries the lesson's word list).
+  int get wordCount =>
+      exercises.fold(0, (sum, exercise) => sum + exercise.words.length);
+
   factory Lesson.fromJson(Map<String, dynamic> json) {
     return Lesson(
       id: json['id'] as String,

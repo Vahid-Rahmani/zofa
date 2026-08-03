@@ -11,6 +11,8 @@ import 'package:zova/data/models/exercise.dart';
 import 'package:zova/data/models/learning_state.dart';
 import 'package:zova/data/models/user_progress.dart';
 import 'package:zova/data/services/dictionary_service.dart';
+import 'package:zova/data/services/english_frequency.dart';
+import 'package:zova/data/services/english_grammar.dart';
 import 'package:zova/data/services/german_frequency.dart';
 import 'package:zova/data/services/seed_content.dart';
 import 'package:zova/data/services/spaced_repetition.dart';
@@ -35,6 +37,21 @@ void main() {
       GermanFrequencyList.assetPath,
       await File('assets/dictionary/german_top_50k.json').readAsString(),
     );
+    // The English course is rebuilt from the 50k vocabulary index and the
+    // grammar data, so those must resolve synchronously for the widget tests.
+    EnglishFrequencyList.seedAsset(
+      EnglishFrequencyList.assetPath,
+      await File('assets/dictionary/english_top_50k.json').readAsString(),
+    );
+    EnglishGrammar.seedAsset(
+      EnglishGrammar.posAssetPath,
+      await File('assets/vocabulary/english_pos.json').readAsString(),
+    );
+    EnglishGrammar.seedAsset(
+      EnglishGrammar.verbsAssetPath,
+      await File('assets/vocabulary/english_irregular_verbs.json')
+          .readAsString(),
+    );
   });
 
   group('SeedContent.courseFor', () {
@@ -57,7 +74,8 @@ void main() {
       }
     });
 
-    test('the German course is built from the German dataset, not English', () async {
+    test('the German course is built from the German dataset, not English',
+        () async {
       final german = (await SeedContent.courseFor('de'))!;
       final english = (await SeedContent.courseFor('en'))!;
 
@@ -101,7 +119,8 @@ void main() {
             }
           case ExerciseType.article:
             expect(exercise.options, contains(exercise.correctAnswer));
-            expect(exercise.options.toSet(), containsAll(['der', 'die', 'das']));
+            expect(
+                exercise.options.toSet(), containsAll(['der', 'die', 'das']));
         }
       }
     });
@@ -128,8 +147,8 @@ void main() {
       var progress = UserProgress();
       progress =
           progress.setLearningWord('de', 'Apfel', LearningState.legacy(box: 1));
-      progress = progress.setLearningWord(
-          'en', 'apple', LearningState.legacy(box: 2));
+      progress =
+          progress.setLearningWord('en', 'apple', LearningState.legacy(box: 2));
       progress = progress.setLearningWord(
           'es', 'manzana', LearningState.legacy(box: 3));
 
@@ -162,8 +181,8 @@ void main() {
       var progress = UserProgress();
       progress =
           progress.setLearningWord('de', 'Apfel', LearningState.legacy(box: 2));
-      progress = progress.setLearningWord(
-          'en', 'apple', LearningState.legacy(box: 1));
+      progress =
+          progress.setLearningWord('en', 'apple', LearningState.legacy(box: 1));
 
       progress = progress.removeLearningWord('de', 'Apfel');
 

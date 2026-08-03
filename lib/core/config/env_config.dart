@@ -52,6 +52,45 @@ class EnvConfig {
     defaultValue: '',
   );
 
+  /// AI tutor API key (Google Gemini by default; any OpenAI-compatible
+  /// provider when [aiProvider] says so).
+  ///
+  /// Never hard-code a key in the source tree. Provide it at build/run time:
+  ///
+  /// ```sh
+  /// flutter run --dart-define-from-file=.env
+  /// ```
+  ///
+  /// with a git-ignored `.env` file containing
+  /// `ZOVA_AI_API_KEY=...`. When the key is empty the AI tutor is disabled
+  /// and the app stays fully offline, falling back to its static data.
+  static const String aiApiKey = String.fromEnvironment(
+    'ZOVA_AI_API_KEY',
+    defaultValue: '',
+  );
+
+  /// AI provider: `gemini` (default) or `openai` (any OpenAI-compatible
+  /// `/chat/completions` endpoint). When empty the key prefix decides.
+  static const String aiProvider = String.fromEnvironment(
+    'ZOVA_AI_PROVIDER',
+    defaultValue: '',
+  );
+
+  /// Optional base URL override. Defaults to
+  /// `https://generativelanguage.googleapis.com/v1beta` for Gemini and
+  /// `https://api.openai.com/v1` for OpenAI-compatible providers.
+  static const String aiBaseUrl = String.fromEnvironment(
+    'ZOVA_AI_BASE_URL',
+    defaultValue: '',
+  );
+
+  /// Optional model override. Defaults to `gemini-2.0-flash` for Gemini and
+  /// `gpt-4o-mini` for OpenAI-compatible providers.
+  static const String aiModel = String.fromEnvironment(
+    'ZOVA_AI_MODEL',
+    defaultValue: '',
+  );
+
   static String get appName => _appName;
 
   /// Whether a real Supabase backend is configured.
@@ -63,6 +102,9 @@ class EnvConfig {
 
   /// Whether a custom translation bridge endpoint is configured.
   static bool get hasTranslationEndpoint => translationEndpoint.isNotEmpty;
+
+  /// Whether an AI tutor API key is configured.
+  static bool get hasAi => aiApiKey.isNotEmpty;
 
   /// The app uses a local demo backend when no remote services are set up.
   static bool get isDemoMode => !hasSupabase;

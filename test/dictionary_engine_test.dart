@@ -7,15 +7,18 @@ import 'package:zova/data/models/exercise.dart';
 import 'package:zova/data/services/dictionary.dart';
 import 'package:zova/data/services/dictionary_index.dart';
 import 'package:zova/data/services/dictionary_service.dart';
+import 'package:zova/data/services/english_frequency.dart';
 import 'package:zova/data/services/seed_content.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late DictionaryService dict;
+  late EnglishFrequencyList freq;
 
   setUpAll(() async {
     dict = await Dictionary.service;
+    freq = await EnglishFrequencyList.service;
   });
 
   group('DictionaryIndex', () {
@@ -55,14 +58,15 @@ void main() {
     });
 
     test('prefix search matches headwords and reports total', () {
-      final result = dict.searchPaged(const DictionaryQuery(query: 'wa', limit: 10));
+      final result =
+          dict.searchPaged(const DictionaryQuery(query: 'wa', limit: 10));
       expect(result.total, greaterThanOrEqualTo(1));
       expect(result.items.every((e) => e.word.startsWith('wa')), isTrue);
     });
 
     test('queries scan headwords and example sentences', () {
-      final result =
-          dict.searchPaged(const DictionaryQuery(query: 'how are you', limit: 20));
+      final result = dict
+          .searchPaged(const DictionaryQuery(query: 'how are you', limit: 20));
       expect(result.total, greaterThanOrEqualTo(1));
       expect(result.items.any((e) => e.word == 'hello'), isTrue);
       final exampleOnly =
@@ -81,7 +85,8 @@ void main() {
 
     test('level + part-of-speech filters narrow results', () {
       final result = dict.searchPaged(
-        const DictionaryQuery(levels: ['A2'], partsOfSpeech: ['noun'], limit: 20),
+        const DictionaryQuery(
+            levels: ['A2'], partsOfSpeech: ['noun'], limit: 20),
       );
       expect(result.total, greaterThanOrEqualTo(1));
       for (final e in result.items) {
@@ -109,8 +114,9 @@ void main() {
     });
   });
 
-  group('course-from-dictionary', () {
-    test('every course word exists in the dictionary', () async {
+  group('course-from-frequency-index', () {
+    test('every course word exists in the master 50k vocabulary list',
+        () async {
       final course = await SeedContent.englishCourse();
       final words = <String>{
         for (final level in course.levels)
@@ -120,8 +126,22 @@ void main() {
       };
       expect(words, isNotEmpty);
       for (final word in words) {
-        expect(dict.lookup(word), isNotNull,
-            reason: '"$word" should exist in the dictionary');
+        expect(freq.rankOf(word), isNotNull,
+            reason: '"$word" should exist in the master vocabulary index');
+      }
+    });
+
+    test('every lesson covers exactly the words its exercises study', () async {
+      final course = await SeedContent.englishCourse();
+      for (final level in course.levels) {
+        for (final lesson in level.lessons) {
+          final flashcard = lesson.exercises.firstWhere(
+            (e) => e.type == ExerciseType.flashcard,
+          );
+          expect(flashcard.words, isNotEmpty);
+          expect(lesson.wordCount, flashcard.words.length,
+              reason: '${lesson.id} should expose its studied word count');
+        }
       }
     });
   });

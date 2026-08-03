@@ -215,7 +215,28 @@ class AppController extends ChangeNotifier {
     if (user == null || _progressData.learningFor(scope).containsKey(word)) {
       return;
     }
-    _progressData = _progressData.setLearningWord(scope, word, _scheduler.newState());
+    _progressData =
+        _progressData.setLearningWord(scope, word, _scheduler.newState());
+    await _progress.saveProgress(user, _progressData);
+    notifyListeners();
+  }
+
+  /// Puts several [words] into the spaced-repetition system at box 1 in a
+  /// single update (persisted once), scoped to the active learning language.
+  /// Used after a lesson to move every studied word into the Leitner review.
+  Future<void> addWordsToLeitner(List<String> words) async {
+    final user = _user;
+    if (user == null) return;
+    final scope = _activeLanguage;
+    var data = _progressData;
+    var changed = false;
+    for (final word in words) {
+      if (data.learningFor(scope).containsKey(word)) continue;
+      data = data.setLearningWord(scope, word, _scheduler.newState());
+      changed = true;
+    }
+    if (!changed) return;
+    _progressData = data;
     await _progress.saveProgress(user, _progressData);
     notifyListeners();
   }
@@ -326,7 +347,9 @@ class AppController extends ChangeNotifier {
   /// Consumes one heart (after applying the timed refill) and persists.
   Future<void> consumeHeart() async {
     final user = _user;
-    if (user == null || _progressData.gamification.heartsAt(_now()) <= 0) return;
+    if (user == null || _progressData.gamification.heartsAt(_now()) <= 0) {
+      return;
+    }
     _progressData = _progressData.copyWith(
       gamification: _progressData.gamification.consumeHeart(_now()),
     );
@@ -356,7 +379,9 @@ class AppController extends ChangeNotifier {
   Future<bool> activateBoost() async {
     final user = _user;
     final g = _progressData.gamification;
-    if (user == null || !g.ownsItem(GamificationState.itemXpBoost)) return false;
+    if (user == null || !g.ownsItem(GamificationState.itemXpBoost)) {
+      return false;
+    }
     _progressData = _progressData.copyWith(
       gamification: g.activateBoost(_now()),
     );

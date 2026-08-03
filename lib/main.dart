@@ -8,6 +8,9 @@ import 'core/state/app_controller.dart';
 import 'core/state/content_translation_controller.dart';
 import 'core/state/language_controller.dart';
 import 'core/state/ui_translation_controller.dart';
+import 'data/services/ai_backend.dart';
+import 'data/services/ai_cache.dart';
+import 'data/services/ai_tutor_service.dart';
 import 'data/services/remote_api.dart';
 import 'data/services/stripe_service.dart';
 import 'data/services/translation_backend.dart';
@@ -30,6 +33,14 @@ Future<void> main() async {
     cache: await _buildTranslationCache(),
   );
 
+  // Boot the AI tutor: on-demand translations, phonetics, examples and
+  // grammar explanations from a hosted model (Gemini by default), with the
+  // same LRU/Hive caching so repeat questions are instant and offline.
+  AiTutorService.instance = AiTutorService(
+    backend: buildDefaultAiBackend(),
+    cache: await _buildAiCache(),
+  );
+
   final language = LanguageController();
   await language.bootstrap();
 
@@ -49,7 +60,8 @@ Future<void> main() async {
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AppController(language: language)),
+        ChangeNotifierProvider(
+            create: (_) => AppController(language: language)),
         ChangeNotifierProvider.value(value: language),
         ChangeNotifierProvider.value(value: uiTranslation),
         ChangeNotifierProvider.value(value: contentTranslation),
@@ -68,5 +80,17 @@ Future<TranslationCache> _buildTranslationCache() async {
     return cache;
   } catch (_) {
     return MemoryTranslationCache();
+  }
+}
+
+Future<AiCache> _buildAiCache() async {
+  try {
+    final directory = await getApplicationSupportDirectory();
+    Hive.init(directory.path);
+    final cache = HiveAiCache();
+    await cache.open();
+    return cache;
+  } catch (_) {
+    return MemoryAiCache();
   }
 }

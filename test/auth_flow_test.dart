@@ -9,6 +9,7 @@ import 'package:zova/core/state/app_controller.dart';
 import 'package:zova/core/state/language_controller.dart';
 import 'package:zova/data/services/dictionary_service.dart';
 import 'package:zova/data/services/english_frequency.dart';
+import 'package:zova/data/services/english_grammar.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +28,15 @@ void main() {
     EnglishFrequencyList.seedAsset(
       'assets/dictionary/english_top_50k.json',
       await File('assets/dictionary/english_top_50k.json').readAsString(),
+    );
+    EnglishGrammar.seedAsset(
+      EnglishGrammar.posAssetPath,
+      await File('assets/vocabulary/english_pos.json').readAsString(),
+    );
+    EnglishGrammar.seedAsset(
+      EnglishGrammar.verbsAssetPath,
+      await File('assets/vocabulary/english_irregular_verbs.json')
+          .readAsString(),
     );
   });
 

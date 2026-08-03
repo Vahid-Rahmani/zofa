@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/state/language_controller.dart';
 import '../../../../core/state/ui_translation_controller.dart';
 import '../../../../core/theme/zova_colors.dart';
 import '../../../../core/widgets/gradient_button.dart';
 import '../../../../core/widgets/tr_text.dart';
 import '../../../../data/models/exercise.dart';
+import '../../../../data/models/translation_result.dart';
+import '../../../../data/services/translation_service.dart';
 
-/// Study session: flip a card to reveal the translation, then mark it as
-/// known or still learning.
+/// Study session: flip a card to reveal the live translation and example, then
+/// mark the word as known or still learning.
 class FlashcardView extends StatefulWidget {
   const FlashcardView({
     super.key,
@@ -57,8 +60,8 @@ class _FlashcardViewState extends State<FlashcardView> {
                   child: Container(
                     key: ValueKey(_flipped),
                     width: double.infinity,
-                    constraints: const BoxConstraints(maxHeight: 300),
-                    padding: const EdgeInsets.all(32),
+                    constraints: const BoxConstraints(maxHeight: 320),
+                    padding: const EdgeInsets.all(28),
                     decoration: BoxDecoration(
                       gradient: _flipped
                           ? null
@@ -77,17 +80,20 @@ class _FlashcardViewState extends State<FlashcardView> {
                           : null,
                     ),
                     child: Center(
-                      child: Text(
-                        _flipped ? _translationOf(_words[_index]) : _words[_index],
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w800,
-                          color: _flipped
-                              ? ZovaColors.textPrimary
-                              : Colors.white,
-                        ),
-                      ),
+                      child: _flipped
+                          ? _FlippedCard(
+                              word: _words[_index],
+                              example: _exampleOf(_words[_index]),
+                            )
+                          : Text(
+                              _words[_index],
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
                 ),
@@ -130,8 +136,110 @@ class _FlashcardViewState extends State<FlashcardView> {
     );
   }
 
-  String _translationOf(String word) {
-    final pairs = widget.exercise.pairs;
-    return pairs[word] ?? word;
+  String _exampleOf(String word) {
+    final examples = widget.exercise.examples;
+    final example = examples[word];
+    if (example != null && example.isNotEmpty) return example;
+    return widget.exercise.pairs[word] ?? '';
+  }
+}
+
+/// The revealed (back) face of a card: the word, its live translation into the
+/// learner's native language, and a contextual example sentence.
+class _FlippedCard extends StatelessWidget {
+  const _FlippedCard({required this.word, required this.example});
+
+  final String word;
+  final String example;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          word,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: ZovaColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        _WordTranslation(word: word),
+        if (example.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Text(
+            example,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.4,
+              color: ZovaColors.textSecondary.withValues(alpha: 0.9),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Live-translates [word] into the learner's content language. Falls back to a
+/// silent empty slot while loading or when the lookup is unavailable, so the
+/// card stays useful offline.
+class _WordTranslation extends StatefulWidget {
+  const _WordTranslation({required this.word});
+
+  final String word;
+
+  @override
+  State<_WordTranslation> createState() => _WordTranslationState();
+}
+
+class _WordTranslationState extends State<_WordTranslation> {
+  TranslationResult? _result;
+  bool _settled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final target =
+        context.read<LanguageController>().settings.contentLanguageCode;
+    TranslationResult? result;
+    try {
+      result = await TranslationService.instance
+          .lookupAnySource(word: widget.word, target: target);
+    } on Exception {
+      result = null;
+    }
+    if (!mounted) return;
+    setState(() {
+      _result = result;
+      _settled = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final result = _result;
+    if (result == null) {
+      // Keep the card height stable while the gloss is being fetched.
+      return SizedBox(height: _settled ? 0 : 20);
+    }
+    return Text(
+      result.translation,
+      textAlign: TextAlign.center,
+      textDirection: result.isRtl ? TextDirection.rtl : TextDirection.ltr,
+      style: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: ZovaColors.secondary,
+      ),
+    );
   }
 }

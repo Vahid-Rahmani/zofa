@@ -6,7 +6,9 @@ import '../../core/state/language_controller.dart';
 import '../../core/state/ui_translation_controller.dart';
 import '../../core/theme/zova_colors.dart';
 import '../../core/widgets/tr_text.dart';
+import '../../data/models/ai_word_details.dart';
 import '../../data/models/translation_result.dart';
+import '../../data/services/ai_tutor_service.dart';
 import '../../data/services/english_grammar.dart';
 import '../../data/services/translation_service.dart';
 
@@ -18,6 +20,10 @@ import '../../data/services/translation_service.dart';
 /// / Future, plus example sentences. Every verb form and example is also
 /// translated live into the learning language, so the learner reads English
 /// and its gloss side by side.
+///
+/// When the AI tutor is configured it additionally generates a phonetic guide,
+/// grammatical gender and contextual examples for the word; those enrich the
+/// card on top of the static data and are cached on-device.
 class WordStudyScreen extends StatefulWidget {
   const WordStudyScreen({super.key, required this.word, this.level, this.rank});
 
@@ -36,6 +42,7 @@ class WordStudyScreen extends StatefulWidget {
 class _WordStudyScreenState extends State<WordStudyScreen> {
   TranslationResult? _result;
   TranslationException? _error;
+  AiWordDetails? _aiDetails;
   EnglishGrammar? _grammar;
   bool _loading = true;
   bool _loadingGlosses = false;
@@ -78,6 +85,13 @@ class _WordStudyScreenState extends State<WordStudyScreen> {
       return;
     }
     await _translateGrammar(target);
+    final ai = await AiTutorService.instance.wordDetails(
+      word: _word,
+      source: 'en',
+      target: target,
+    );
+    if (!mounted) return;
+    setState(() => _aiDetails = ai);
   }
 
   /// Loads the grammar data and live-translates the verb forms and example
@@ -157,11 +171,25 @@ class _WordStudyScreenState extends State<WordStudyScreen> {
 
     final grammar = _grammar;
     final pos = grammar?.partOfSpeech(_word) ?? result.partOfSpeech;
+    final gender = _aiDetails?.gender ?? result.gender;
     final forms = grammar?.verbForms(_word);
     final examples = grammar == null
         ? const <String>[]
         : grammar.exampleSentences(_word, grammar.sectionOf(_word));
+    final aiExamples = _aiDetails?.examples ?? const <AiExample>[];
     final rtl = result.isRtl;
+    final metaChips = <Widget>[
+      if (pos != null)
+        _Chip(
+          icon: Icons.category_outlined,
+          label: context.tr(pos),
+        ),
+      if (gender != null)
+        _Chip(
+          icon: Icons.transgender_outlined,
+          label: gender,
+        ),
+    ];
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
@@ -181,12 +209,30 @@ class _WordStudyScreenState extends State<WordStudyScreen> {
                       color: ZovaColors.textPrimary,
                     ),
                   ),
-                  if (pos != null) ...[
+                  if (_aiDetails?.phonetic != null) ...[
                     const SizedBox(height: 6),
-                    _Chip(
-                      icon: Icons.category_outlined,
-                      label: context.tr(pos),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.record_voice_over_outlined,
+                          size: 15,
+                          color: ZovaColors.textSecondary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _aiDetails!.phonetic!,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: ZovaColors.textSecondary,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
                     ),
+                  ],
+                  if (metaChips.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Wrap(spacing: 8, runSpacing: 8, children: metaChips),
                   ],
                 ],
               ),
@@ -205,7 +251,8 @@ class _WordStudyScreenState extends State<WordStudyScreen> {
             children: [
               if (widget.level != null) _LevelChip(level: widget.level!),
               if (widget.rank != null) ...[
-                const Icon(Icons.tag, size: 15, color: ZovaColors.textSecondary),
+                const Icon(Icons.tag,
+                    size: 15, color: ZovaColors.textSecondary),
                 Text(
                   '#${widget.rank}',
                   style: const TextStyle(
@@ -256,6 +303,27 @@ class _WordStudyScreenState extends State<WordStudyScreen> {
               color: ZovaColors.textPrimary,
             ),
           ),
+        ] else if (_aiDetails?.definition != null &&
+            _aiDetails!.definition!.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          const TrText(
+            'Meaning',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: ZovaColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _aiDetails!.definition!,
+            textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
+            style: const TextStyle(
+              fontSize: 16,
+              height: 1.5,
+              color: ZovaColors.textPrimary,
+            ),
+          ),
         ],
         if (result.alternates.isNotEmpty) ...[
           const SizedBox(height: 18),
@@ -282,8 +350,7 @@ class _WordStudyScreenState extends State<WordStudyScreen> {
                   ),
                   child: Text(
                     alt,
-                    textDirection:
-                        rtl ? TextDirection.rtl : TextDirection.ltr,
+                    textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
                     style: const TextStyle(
                       fontSize: 14,
                       color: ZovaColors.textPrimary,
@@ -318,6 +385,34 @@ class _WordStudyScreenState extends State<WordStudyScreen> {
               english: example,
               gloss: _glosses[example],
               loadingGlosses: _loadingGlosses,
+              rtl: rtl,
+            ),
+            const SizedBox(height: 8),
+          ],
+        ],
+        if (aiExamples.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          const Row(
+            children: [
+              Icon(Icons.auto_awesome,
+                  size: 16, color: ZovaColors.primary),
+              SizedBox(width: 6),
+              TrText(
+                'AI examples',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: ZovaColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (final example in aiExamples) ...[
+            _ExampleTile(
+              english: example.sentence,
+              gloss: example.translation,
+              loadingGlosses: false,
               rtl: rtl,
             ),
             const SizedBox(height: 8),
@@ -574,8 +669,7 @@ class _SaveLeitnerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = context.watch<AppController>();
     context.watch<UiTranslationController?>();
-    final scope =
-        context.read<LanguageController>().settings.learningLanguage;
+    final scope = context.read<LanguageController>().settings.learningLanguage;
     final isSaved = controller.progress.savedWordsFor(scope).contains(word);
     final inLeitner =
         controller.progress.leitnerBoxesFor(scope).containsKey(word);

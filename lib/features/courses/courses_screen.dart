@@ -30,10 +30,8 @@ class CoursesScreen extends StatefulWidget {
 class _CoursesScreenState extends State<CoursesScreen> {
   @override
   Widget build(BuildContext context) {
-    final languageCode = context
-        .watch<LanguageController>()
-        .settings
-        .learningLanguage;
+    final languageCode =
+        context.watch<LanguageController>().settings.learningLanguage;
     context.watch<UiTranslationController?>();
     return FutureBuilder<Course?>(
       future: SeedContent.courseFor(languageCode),
@@ -64,10 +62,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
 
   Widget _buildRoadmap(BuildContext context, Course course) {
     final controller = context.watch<AppController>();
-    final languageCode = context
-        .read<LanguageController>()
-        .settings
-        .learningLanguage;
+    final languageCode =
+        context.read<LanguageController>().settings.learningLanguage;
     final completedIds = controller.progress.completedLessonsFor(languageCode);
 
     final roadmap = <_RoadmapEntry>[];
@@ -101,9 +97,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
               SliverToBoxAdapter(
                 child: _LevelSection(
                   level: level,
-                  entries: roadmap
-                      .where((entry) => entry.level == level)
-                      .toList(),
+                  entries:
+                      roadmap.where((entry) => entry.level == level).toList(),
                   roadmap: roadmap,
                   startIndex: levelStarts[index],
                   completedIds: completedIds,
@@ -433,7 +428,8 @@ class _LessonCard extends StatelessWidget {
               ? context.tr('Completed')
               : isLocked
                   ? context.tr('Locked')
-                  : context.trTempl('{0} exercises', [
+                  : context.trTempl('{0} words · {1} exercises', [
+                      lesson.wordCount,
                       lesson.exercises.length,
                     ]),
           style: TextStyle(

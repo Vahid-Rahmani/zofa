@@ -53,10 +53,10 @@ class _LessonScreenState extends State<LessonScreen> {
 
   Future<void> _finish() async {
     setState(() => _leaving = true);
-    final words = widget.lesson.exercises.fold<int>(
-      0,
-      (sum, exercise) => sum + exercise.words.length,
-    );
+    final lessonWords = <String>{
+      for (final exercise in widget.lesson.exercises) ...exercise.words,
+    };
+    final words = lessonWords.length;
     final xp = 10 * widget.lesson.exercises.length + _correct * 5;
 
     final controller = context.read<AppController>();
@@ -66,6 +66,10 @@ class _LessonScreenState extends State<LessonScreen> {
       xpEarned: xp,
       wordsEarned: words,
     );
+    // Every word studied in the lesson joins the Leitner review deck (scoped
+    // to the active learning language) so flashcards and spaced repetition
+    // always practice exactly the words the lesson taught.
+    await controller.addWordsToLeitner(lessonWords.toList());
 
     if (!mounted) return;
     widget.onComplete();
@@ -171,28 +175,23 @@ class _LessonScreenState extends State<LessonScreen> {
                 child: switch (exercise.type) {
                   ExerciseType.flashcard => FlashcardView(
                       exercise: exercise,
-                      onDone: (correct) =>
-                          _handleResult(correct: correct),
+                      onDone: (correct) => _handleResult(correct: correct),
                     ),
                   ExerciseType.chooseAnswer => ChooseAnswerView(
                       exercise: exercise,
-                      onDone: (correct) =>
-                          _handleResult(correct: correct),
+                      onDone: (correct) => _handleResult(correct: correct),
                     ),
                   ExerciseType.translate => TranslateView(
                       exercise: exercise,
-                      onDone: (correct) =>
-                          _handleResult(correct: correct),
+                      onDone: (correct) => _handleResult(correct: correct),
                     ),
                   ExerciseType.pairs => PairsView(
                       exercise: exercise,
-                      onDone: (correct) =>
-                          _handleResult(correct: correct),
+                      onDone: (correct) => _handleResult(correct: correct),
                     ),
                   ExerciseType.article => ArticleView(
                       exercise: exercise,
-                      onDone: (correct) =>
-                          _handleResult(correct: correct),
+                      onDone: (correct) => _handleResult(correct: correct),
                     ),
                 },
               ),
