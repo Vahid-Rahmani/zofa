@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:zova/core/state/app_controller.dart';
 import 'package:zova/core/state/language_controller.dart';
 import 'package:zova/data/services/english_frequency.dart';
+import 'package:zova/data/services/english_grammar.dart';
 import 'package:zova/features/vocabulary/level_words_screen.dart';
 import 'package:zova/features/vocabulary/vocabulary_screen.dart';
 
@@ -15,9 +16,11 @@ import 'package:zova/features/vocabulary/vocabulary_screen.dart';
 const Map<int, String> kAnchors = {
   1: 'you', // A1
   3: 'the',
-  6: 'be',
+  6: 'be', // A1 verb
   8: 'this',
-  500: 'happy', // A1
+  50: 'apple', // A1 noun
+  60: 'quickly', // A1 adverb
+  500: 'happy', // A1 adjective
   1001: 'from', // A2
   1500: 'school', // A2
   2501: 'good', // B1
@@ -38,11 +41,48 @@ List<String> _buildFiftyThousand() {
   return words;
 }
 
+Map<String, dynamic> _seedPos() => {
+      'you': 'pronoun',
+      'the': 'determiner',
+      'be': 'verb',
+      'this': 'pronoun',
+      'apple': 'noun',
+      'quickly': 'adverb',
+      'happy': 'adjective',
+      'from': 'preposition',
+      'school': 'noun',
+      'good': 'adjective',
+      'people': 'noun',
+      'brother': 'noun',
+      'explore': 'verb',
+      'diamond': 'noun',
+      'philosopher': 'noun',
+      'photosynthesis': 'noun',
+      'manufacture': 'verb',
+      'quintessential': 'adjective',
+      'transformation': 'noun',
+    };
+
+Map<String, dynamic> _seedVerbs() => {
+      'be': {'past': 'was/were', 'participle': 'been'},
+      'run': {'past': 'ran', 'participle': 'run'},
+      'go': {'past': 'went', 'participle': 'gone'},
+      'stop': {'past': 'stopped', 'participle': 'stopped'},
+    };
+
 void main() {
   setUpAll(() {
     EnglishFrequencyList.seedAsset(
       EnglishFrequencyList.assetPath,
       jsonEncode(_buildFiftyThousand()),
+    );
+    EnglishGrammar.seedAsset(
+      EnglishGrammar.posAssetPath,
+      jsonEncode(_seedPos()),
+    );
+    EnglishGrammar.seedAsset(
+      EnglishGrammar.verbsAssetPath,
+      jsonEncode(_seedVerbs()),
     );
   });
 
@@ -172,14 +212,22 @@ void main() {
       );
     }
 
-    testWidgets('lists the words of the level with ranks', (tester) async {
+    testWidgets('lists the words of the level grouped by part of speech',
+        (tester) async {
       await tester.pumpWidget(wrap(const LevelWordsScreen(level: 'A1')));
       await tester.pumpAndSettle();
 
       expect(find.text('A1 · Beginner'), findsOneWidget);
       expect(find.text('1000 words'), findsOneWidget);
-      expect(find.text('you'), findsOneWidget);
-      expect(find.text('#1'), findsOneWidget);
+
+      // Words are grouped into part-of-speech sections with counts.
+      expect(find.text('Verbs'), findsOneWidget);
+      expect(find.text('be'), findsOneWidget);
+      expect(find.text('#6'), findsOneWidget);
+      expect(find.text('Nouns'), findsOneWidget);
+      expect(find.text('apple'), findsOneWidget);
+      expect(find.text('Adverbs'), findsOneWidget);
+      expect(find.text('quickly'), findsOneWidget);
 
       // Ranks further down the level list render lazily; scroll to one.
       await tester.scrollUntilVisible(
@@ -189,6 +237,16 @@ void main() {
       );
       expect(find.text('happy'), findsOneWidget);
       expect(find.text('#500'), findsOneWidget);
+      expect(find.text('Adjectives'), findsOneWidget);
+
+      // The untagged words land in the trailing "Other words" section.
+      await tester.scrollUntilVisible(
+        find.text('you'),
+        -200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(find.text('you'), findsOneWidget);
+      expect(find.text('#1'), findsOneWidget);
     });
 
     testWidgets('filter narrows the level list', (tester) async {
